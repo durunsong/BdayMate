@@ -66,6 +66,7 @@ test('register, verify, manage a birthday, deliver its reminder, import CSV and 
   account,
 }) => {
   await registerAndVerify(page, account);
+  await expect(page.locator('.sidebar .brand img')).toBeVisible();
   const today = localDate(new Date(), 'Asia/Shanghai');
   const [, month, day] = today.split('-');
   const name = '今天的生日朋友';
@@ -186,6 +187,7 @@ test('register, verify, manage a birthday, deliver its reminder, import CSV and 
   await page.getByRole('button', { name: '打开菜单', exact: true }).click();
   const navigation = page.getByRole('dialog', { name: '主导航', exact: true });
   await expect(navigation).toBeVisible();
+  await expect(navigation.locator('.brand img')).toBeVisible();
   await navigation.getByRole('link', { name: '生日日历', exact: true }).click();
   await expect(page).toHaveURL(/\/calendar$/);
   await expect(navigation).not.toBeVisible();

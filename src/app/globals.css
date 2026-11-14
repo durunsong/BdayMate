@@ -549,14 +549,12 @@ input[type='checkbox'] {
   padding: 0 13px;
 }
 .brand-icon {
-  display: grid;
-  place-items: center;
-  width: 43px;
-  height: 43px;
-  border-radius: 13px;
-  background: var(--primary);
-  color: white;
-  box-shadow: 0 4px 10px #6366f129;
+  display: block;
+  flex-shrink: 0;
+  width: 48px;
+  height: 48px;
+  object-fit: contain;
+  border-radius: 23%;
 }
 .brand strong {
   font-size: 22px;
@@ -1877,6 +1875,10 @@ input[type='checkbox'] {
 .auth-story > .brand {
   padding: 0;
 }
+.auth-story > .brand .brand-icon {
+  width: 64px;
+  height: 64px;
+}
 .auth-story-body {
   margin: auto 0;
   max-width: 460px;
@@ -1993,6 +1995,10 @@ input[type='checkbox'] {
 .auth-mobile-brand {
   display: none;
   margin-bottom: 40px;
+}
+.auth-mobile-brand .brand-icon {
+  width: 56px;
+  height: 56px;
 }
 .auth-assurance {
   margin-top: 46px;

@@ -1,5 +1,9 @@
 # BdayMate · 生日搭子
 
+<img src="public/brand/bdaymate-logo.png" width="96" height="96" alt="BdayMate 生日搭子 Logo" />
+
+品牌图标、浏览器 favicon 与分享预览的维护说明见 [品牌素材](docs/branding.md)。
+
 Never Miss a Special Day. 一个真实连接 PostgreSQL 的个人生日管理应用：公历/农历、联系人和标签、日历、提醒队列、祝福语、礼物与邮件记录。
 
 ## 本地运行

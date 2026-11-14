@@ -6,6 +6,7 @@ import {
   Heading,
   Hr,
   Html,
+  Img,
   Preview,
   Section,
   Text,
@@ -44,7 +45,19 @@ export function BrandedEmail({
             maxWidth: '560px',
           }}
         >
-          <Text style={{ color: '#4f46e5', fontWeight: 700, fontSize: '20px' }}>
+          <Img
+            src={new URL(
+              '/brand/bdaymate-logo.png',
+              process.env.NEXT_PUBLIC_APP_URL ||
+                process.env.BETTER_AUTH_URL ||
+                'https://bdaymate.vercel.app',
+            ).toString()}
+            alt="BdayMate 生日搭子"
+            width="64"
+            height="64"
+            style={{ borderRadius: '14px', display: 'block' }}
+          />
+          <Text style={{ color: '#6421d9', fontWeight: 700, fontSize: '20px' }}>
             BdayMate · 生日搭子
           </Text>
           <Heading style={{ fontSize: '26px', lineHeight: '1.4' }}>
@@ -65,7 +78,7 @@ export function BrandedEmail({
             <Button
               href={url}
               style={{
-                backgroundColor: '#4f46e5',
+                backgroundColor: '#6421d9',
                 color: '#ffffff',
                 borderRadius: '8px',
                 padding: '13px 20px',

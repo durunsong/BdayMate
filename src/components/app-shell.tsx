@@ -1,5 +1,6 @@
 'use client';
 import Link from 'next/link';
+import Image from 'next/image';
 import { usePathname, useRouter } from 'next/navigation';
 import {
   Bell,
@@ -44,9 +45,15 @@ export function Brand() {
       className="brand"
       aria-label="BdayMate 生日搭子首页"
     >
-      <span className="brand-icon">
-        <Cake size={24} strokeWidth={1.8} />
-      </span>
+      <Image
+        src="/brand/bdaymate-logo.png"
+        alt=""
+        width={64}
+        height={64}
+        sizes="64px"
+        className="brand-icon"
+        priority
+      />
       <span>
         <strong>
           BdayMate<span className="brand-dot">.</span>

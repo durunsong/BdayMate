@@ -77,3 +77,11 @@
 - SMTP 仍按用户要求预留 xxxx；未登录 Vercel 或配置未知的线上域名，不声称已建立线上部署或激活定时器。
 
 复验：pnpm lint、pnpm typecheck 已通过；pnpm test 为 10 个文件、146 项全部通过（含 10 项 GitHub 调度脚本测试）。3 条浏览器 E2E 通过，覆盖鉴权 GET/POST、真实 SMTP 投递与重复消费不重复发信。corepack pnpm install --frozen-lockfile 使用 pnpm 10.33.2 原样安装通过。Vercel 标志下的 Next.js 生产构建与官方配置 Schema 校验通过。
+
+## 用户 Logo 与品牌统一（2026-11-14）
+
+- 按用户提供的 Logo 统一登录及注册页面、桌面侧栏、手机菜单和事务邮件。原图仅裁去外部留白并等比例缩放；品牌文本、可访问名称和业务图标继续保留。
+- 新增 16/32/48/64 多尺寸 RGBA favicon、32px PNG、180px Apple 图标、192/512px 应用清单图标、1200×630 分享预览与 Open Graph/Twitter metadata。维护路径与约束见 [branding.md](branding.md)。
+- 新增检查先复现旧品牌图像与 favicon 缺失，再验证替换后的图片加载、移动布局、metadata、真实图标响应与邮件中的绝对图片地址。
+- 本轮 pnpm lint、pnpm typecheck、pnpm format:check 和生产环境变量下的 pnpm build 均通过；pnpm test 为 11 个文件、147 项通过；PLAYWRIGHT_CHANNEL=chrome pnpm test:e2e 为 5 项通过，包括真实认证、隔离 SMTP 投递、桌面侧栏和手机菜单。Impeccable 机械检查未报告问题。
+- 邮件回归使用本地 SMTP 捕获服务，不向真实用户发送额外邮件。此次没有修改数据库结构、认证流程、提醒调度或秘密配置。
