@@ -8,4 +8,4 @@
 - [x] Build responsive motion homepage and editable greeting experience.
 - [x] Run integration/browser regressions and bounded desktop/mobile visual review.
 - [x] Run final tests, types, lint, format, build, encoding and secret checks.
-- [ ] Commit/push intended changes and verify production deployment.
+- [x] Commit/push intended changes and verify production deployment.

@@ -115,3 +115,5 @@
 - 本次没有新增依赖或数据库迁移，没有向真实收件人发送验收邮件。测试使用本地 SMTP 捕获与精确隔离账号；跨邮箱客户端实际渲染可能有差异。
 
 验证：`pnpm test` 19 个文件、194 项通过；`PLAYWRIGHT_CHANNEL=chrome pnpm test:e2e` 19 条全部通过。覆盖真实注册/验邮/重置/登录拦截、本地 SMTP、生日提醒与联系人祝福、文件下载、延迟导航、主题持久化/系统偏好/跨标签页、暂停动画、1440px/390px 双主题业务页面和弹窗。`pnpm lint`、`pnpm typecheck`、`pnpm format:check`、Vercel production 参数下 `pnpm build`、`git diff --check` 通过。Impeccable 机械检查无报告；最终桌面/手机截图检查并修正了关闭按钮定位。修改文件通过 UTF-8、BOM、异常替换字符、个人路径和秘密值扫描。
+
+发布验收：功能提交 `0c65ffd804c526d4fe8c68796426dbdd2df43218` 已正常推送 `main` 与 `feat/full-birthday-platform`；Vercel Production 部署 `4k5UxUgZhKyqty99L4uZ2Yd2zTsf` 显示 Ready，并绑定正式域名。线上首页、登录、注册和 favicon 返回 200；未授权导出与邮件 Cron 保持 401。实际浏览器确认圆形主题切换、跨页主题保留、顶部加载反馈及登录页完成后加载条消失。开发分支的 Preview 沿用独立环境配置，不复制生产密钥；本次正式发布不依赖 Preview。
