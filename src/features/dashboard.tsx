@@ -31,9 +31,24 @@ import {
 import { ContactBirthdayRow, birthdayLabel } from '@/features/contact-display';
 import type { Workspace } from '@/lib/types';
 import { BirthdayService, localDate } from '@/services/birthday';
+import { LUNAR_MIN_SOLAR_DATE, LUNAR_MAX_SOLAR_DATE } from '@/lib/lunar';
 export function Dashboard({ workspace }: { workspace: Workspace }) {
-  const contacts = workspace.contacts.filter((c) => !c.archivedAt);
-  const today = localDate(new Date(), workspace.timeZone);
+  const now = new Date();
+  const errors = new Set<string>();
+  const contacts = workspace.contacts
+    .filter((c) => !c.archivedAt)
+    .map((contact) => {
+      try {
+        return {
+          ...contact,
+          next: BirthdayService.next(contact, workspace.timeZone, now),
+        };
+      } catch {
+        errors.add(contact.name);
+        return { ...contact, next: null };
+      }
+    });
+  const today = localDate(now, workspace.timeZone);
   const year = Number(today.slice(0, 4));
   const month = Number(today.slice(5, 7));
   const birthdaysToday = contacts.filter((c) => c.next?.daysUntil === 0);
@@ -46,16 +61,24 @@ export function Dashboard({ workspace }: { workspace: Workspace }) {
   }));
   contacts.forEach((contact) => {
     try {
+      const lunar = contact.birthdayType === 'LUNAR';
+      const start = `${year}-01-01`;
+      const end = `${year}-12-31`;
+      const rangeStart =
+        lunar && start < LUNAR_MIN_SOLAR_DATE ? LUNAR_MIN_SOLAR_DATE : start;
+      const rangeEnd =
+        lunar && end > LUNAR_MAX_SOLAR_DATE ? LUNAR_MAX_SOLAR_DATE : end;
+      if (rangeStart > rangeEnd) return;
       BirthdayService.between(
         contact,
-        `${year}-01-01`,
-        `${year}-12-31`,
+        rangeStart,
+        rangeEnd,
         workspace.timeZone,
       ).forEach(
         (date) => monthly[Number(date.date.slice(5, 7)) - 1].birthdays++,
       );
     } catch {
-      /* Invalid dates are surfaced on contact detail. */
+      errors.add(contact.name);
     }
   });
   const stats = [
@@ -105,7 +128,7 @@ export function Dashboard({ workspace }: { workspace: Workspace }) {
             month: 'long',
             day: 'numeric',
             weekday: 'long',
-          }).format(new Date())}
+          }).format(now)}
         </span>
         <Button asChild>
           <Link href="/contacts/new">
@@ -114,6 +137,20 @@ export function Dashboard({ workspace }: { workspace: Workspace }) {
           </Link>
         </Button>
       </PageHeading>
+      {errors.size > 0 && (
+        <div className="notification-inline danger-text" role="alert">
+          以下联系人的生日无法完整计算，相关统计可能不完整，请检查生日或支持范围：
+          {[...errors].join('、')}。
+        </div>
+      )}
+      {contacts.some((c) => c.birthdayType === 'LUNAR') &&
+        (`${year}-01-01` < LUNAR_MIN_SOLAR_DATE ||
+          `${year}-12-31` > LUNAR_MAX_SOLAR_DATE) && (
+          <div className="notification-inline" role="status">
+            农历生日仅统计 {LUNAR_MIN_SOLAR_DATE} 至 {LUNAR_MAX_SOLAR_DATE}{' '}
+            范围内的日期。
+          </div>
+        )}
       <div className="stats-grid">
         {stats.map((stat) => (
           <div className={`stat-card ${stat.tone}`} key={stat.label}>

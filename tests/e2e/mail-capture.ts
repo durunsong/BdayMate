@@ -10,7 +10,7 @@ export type CapturedMail = {
   text: string;
 };
 
-function decodeMail(raw: string): string {
+export function decodeMail(raw: string): string {
   return raw
     .split(/--[^\r\n]+\r?\n/)
     .map((part) => {

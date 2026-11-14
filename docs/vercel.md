@@ -30,14 +30,14 @@ Production Branch 选择 main。完整应用和定时工作流一起推送到 ma
 | CRON_SECRET                                   | 至少 32 字符独立随机值；不能带换行或前后空格 |
 | BETTER_AUTH_URL                               | 实际稳定的 HTTPS 生产域名                    |
 | NEXT_PUBLIC_APP_URL                           | 与 BETTER_AUTH_URL 相同的 HTTPS 域名         |
-| SMTP_HOST / SMTP_USER / SMTP_PASS / SMTP_FROM | 邮件供应商参数；当前按用户要求预留 xxxx      |
+| SMTP_HOST / SMTP_USER / SMTP_PASS / SMTP_FROM | 邮件供应商参数；真实值仅在生产环境配置       |
 | SMTP_PORT                                     | 465 或供应商指定端口                         |
 | SMTP_SECURE                                   | 465 通常 true，587 STARTTLS 通常 false       |
 | SMTP_FROM_NAME                                | BdayMate                                     |
 
 两个 URL 必须替换 localhost，保证站点地址、认证回调和邮件链接处于同一域名。首次域名不确定时，先创建项目取得域名，再更新变量并 Redeploy。NEXT_PUBLIC_APP_URL 在构建时写入，修改后必须重新部署。Preview 请使用独立数据库和匹配的 URL，不向不受信任分支开放生产数据库或邮件凭据。
 
-xxxx 仅为占位。页面可以构建并打开，但注册验证、密码重置、提醒送达仍需真实 SMTP，应用不会绕过验证。SMTP 使用 465/587，不使用端口 25。
+xxxx 仅为本地示例占位；注册验证、密码重置、提醒和祝福均需真实 SMTP，应用不会绕过验证。SMTP 使用 465/587，不使用端口 25。
 
 ## 3. 数据库迁移
 

@@ -70,7 +70,7 @@ openspec/         范围、设计、验收和任务清单
 | `SMTP_USER/PASS/FROM/FROM_NAME` | 邮件账号密码、发件邮箱和品牌名称                                    |
 | `CRON_SECRET`                   | 至少 32 字符独立随机 Bearer 密钥                                    |
 
-可用 `openssl rand -base64 48` 生成随机秘密。对外 SMTP 强制 TLS、验证服务器证书。只有 loopback SMTP 测试允许明文传输。邮件只发给 BdayMate 账户邮箱，不自动发给联系人。
+可用 `openssl rand -base64 48` 生成随机秘密。对外 SMTP 强制 TLS、验证服务器证书。只有 loopback SMTP 测试允许明文传输。提前提醒发给 BdayMate 账户邮箱；联系人详情中可独立开启生日当天自动祝福，发送到该联系人的邮箱。默认关闭，不会因填写邮箱而自动开启。
 
 ## 提醒与独立 Worker
 
@@ -107,10 +107,19 @@ pnpm build
 pnpm db:status
 ```
 
-数据库集成测试需要可写的专用开发库；只创建唯一 `test-…@example.test` 账号并按本次记录 ID 清理。测试不会清空已有数据。E2E 启动独立 loopback SMTP 捕获与测试应用；详情见 [E2E 手册](docs/e2e.md)。真实外部 SMTP 账号由用户在开发完成后提供，再执行供应商送达验收。
+数据库集成测试需要可写的专用开发库；只创建唯一 `test-…@example.test` 账号并按本次记录 ID 清理。测试不会清空已有数据。E2E 启动独立 loopback SMTP 捕获与测试应用；详情见 [E2E 手册](docs/e2e.md)。外部 SMTP 由部署环境配置；回归测试始终覆盖为本地捕获服务，不向真实联系人试发。
 
 ## 版本与交付状态
 
 锁文件固定可复现依赖。Next/React 使用本次查询到的稳定版本；Prisma 7.10.1 避开不兼容的 8 RC。TypeScript 6.0 和 ESLint 9 使用 Next ESLint 插件当前声明支持的版本范围；后续随上游插件一起升级。任务书指定的 `@react-email/components` 已被上游标记 deprecated，目前仍用于品牌模板；安装和审计信息记录于开发进度，不声称依赖永无风险。
 
 原始需求在 [requirements.md](docs/requirements.md)，逐项交付/验证状态见 [progress.md](docs/progress.md)。项目保留上游 Apache-2.0 LICENSE。
+
+## 生日与两类邮件
+
+- 每年按记录的公历/农历生日重新计算；支持边界、闰月/闰日规则及 HKO 全量核对见 [生日规则](docs/birthday-rules.md)。
+- 提醒自己：全局或联系人独立设置提前 0–45 天（最多 12 个提醒日）和时间，0 表示当天提醒本人。
+- 祝福联系人：填写联系人邮箱，在详情中开启“自动生日祝福”，设置时间和正文；按你的时区，每次生日一次。关闭自我提醒不会关闭已开启的联系人祝福。
+- 归档、移除邮箱、关闭祝福或修改生日会同步取消/重排未发送任务。已过提醒日不集中补发；当天已到时间的新设置会进入到期队列。
+- 本次新增 ContactGreetingSetting 表的迁移需在部署新版前执行；既有联系人默认不发送祝福。
+- GitHub Actions 每 5 分钟尽力触发，可能延迟，不能保证整分钟到达。队列接受成功不等于收件箱实际送达。

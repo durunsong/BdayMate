@@ -145,6 +145,7 @@ model Contact {
   updatedAt       DateTime                @updatedAt
   archivedAt      DateTime?
   tags            ContactTag[]
+  greetingSetting ContactGreetingSetting?
   reminderSetting ContactReminderSetting?
   gifts           GiftRecord[]
   emailQueue      EmailQueue[]
@@ -207,6 +208,19 @@ model ContactReminderSetting {
 
   @@unique([contactId, userId])
   @@map("bday_contact_reminder")
+}
+
+model ContactGreetingSetting {
+  id        String  @id @default(cuid())
+  contactId String  @unique
+  userId    String
+  contact   Contact @relation(fields: [contactId, userId], references: [id, userId], onDelete: Cascade)
+  enabled   Boolean @default(false)
+  sendTime  String  @default("09:00")
+  message   String
+
+  @@unique([contactId, userId])
+  @@map("bday_contact_greeting")
 }
 
 model EmailQueue {

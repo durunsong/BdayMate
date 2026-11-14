@@ -16,6 +16,7 @@ export type BrandedEmailProps = {
   body: string;
   url?: string;
   buttonLabel?: string;
+  footer?: string;
   details?: { label: string; value: string }[];
 };
 export function BrandedEmail({
@@ -24,6 +25,7 @@ export function BrandedEmail({
   url,
   buttonLabel = '打开 BdayMate',
   details = [],
+  footer = '这封邮件来自你的 BdayMate 账户。可在设置中管理生日提醒。',
 }: BrandedEmailProps) {
   return (
     <Html lang="zh-CN">
@@ -92,7 +94,7 @@ export function BrandedEmail({
           <Text style={{ fontSize: '12px', color: '#64748b' }}>
             Never Miss a Special Day.
             <br />
-            这封邮件来自你的 BdayMate 账户。可在设置中管理生日提醒。
+            {footer}
           </Text>
         </Container>
       </Body>

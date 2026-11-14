@@ -3,7 +3,11 @@ import type { AddressInfo, Socket } from 'node:net';
 
 export async function startSMTP() {
   const messages: { recipient: string; source: string }[] = [];
-  const state = { reject: false, acceptWithoutAck: false };
+  const state = {
+    reject: false,
+    acceptWithoutAck: false,
+    onAccepted: undefined as (() => void) | undefined,
+  };
   const sockets = new Set<Socket>();
   const server = new SMTPServer({
     disabledCommands: ['AUTH', 'STARTTLS'],
@@ -28,6 +32,7 @@ export async function startSMTP() {
           recipient: session.envelope.rcptTo[0]?.address || '',
           source,
         });
+        state.onAccepted?.();
         if (state.acceptWithoutAck) {
           for (const socket of sockets) socket.destroy();
           return;

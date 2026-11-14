@@ -387,6 +387,27 @@ describe('atomic SMTP worker', () => {
     ).toBe(5);
   }, 60_000);
 
+  it('cancels missed lead-day reminders instead of flooding the next day', async () => {
+    const user = await fixture(21);
+    await generateReminders({ userId: user.id, now });
+    const missed = await db.emailQueue.findFirstOrThrow({
+      where: { userId: user.id },
+      orderBy: { scheduledAt: 'asc' },
+    });
+    await processEmailQueue({
+      userId: user.id,
+      now: new Date('2001-06-15T02:00:00Z'),
+      limit: 10,
+    });
+    expect(smtp.messages).toHaveLength(0);
+    expect(
+      await db.emailQueue.findUnique({ where: { id: missed.id } }),
+    ).toMatchObject({
+      lastError: expect.stringMatching(/^CANCELLED:/),
+      attemptCount: 0,
+    });
+  });
+
   it('expires an overdue reminder after the birthday instead of mailing an obsolete date', async () => {
     const user = await fixture(14);
     await generateReminders({ userId: user.id, now });

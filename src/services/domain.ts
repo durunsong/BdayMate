@@ -12,6 +12,7 @@ import {
   profileSchema,
   preferenceSchema,
   contactReminderSchema,
+  contactGreetingSchema,
   idSchema,
 } from '@/lib/validation';
 import { BirthdayService, type BirthdayInput } from './birthday';
@@ -62,7 +63,11 @@ async function readWorkspace(userId: string): Promise<Workspace> {
     db.reminderPreference.findUnique({ where: { userId } }),
     db.contact.findMany({
       where: { userId },
-      include: { tags: { include: { tag: true } }, reminderSetting: true },
+      include: {
+        tags: { include: { tag: true } },
+        reminderSetting: true,
+        greetingSetting: true,
+      },
       orderBy: { createdAt: 'desc' },
     }),
     db.tag.findMany({
@@ -138,6 +143,13 @@ async function readWorkspace(userId: string): Promise<Workspace> {
         .filter(Boolean),
       next,
       birthdayError,
+      greetingSetting: c.greetingSetting
+        ? {
+            enabled: c.greetingSetting.enabled,
+            sendTime: c.greetingSetting.sendTime,
+            message: c.greetingSetting.message,
+          }
+        : null,
       reminderSetting: c.reminderSetting
         ? {
             enabled: c.reminderSetting.enabled,
@@ -489,6 +501,27 @@ export async function mutate(
           });
           rebuild = true;
           message = '提醒偏好已更新';
+          break;
+        }
+        case 'saveContactGreeting': {
+          const { contactId, ...settings } = contactGreetingSchema.parse(input);
+          const contact = await ownedContact(tx, userId, contactId);
+          if (
+            settings.enabled &&
+            (!contact.email ||
+              !z.email().safeParse(contact.email).success ||
+              contact.archivedAt)
+          )
+            throw new DomainError('请先为未归档的联系人填写有效邮箱');
+          await tx.contactGreetingSetting.upsert({
+            where: { contactId },
+            create: { contactId, userId, ...settings },
+            update: settings,
+          });
+          rebuild = true;
+          message = settings.enabled
+            ? '生日当天自动祝福已开启'
+            : '自动生日祝福已关闭';
           break;
         }
         case 'saveContactReminder': {

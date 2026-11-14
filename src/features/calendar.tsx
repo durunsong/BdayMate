@@ -20,6 +20,7 @@ import {
   type BirthdayOccurrence,
 } from '@/services/birthday';
 import { birthdayLabel } from '@/features/contact-display';
+import { LUNAR_MIN_SOLAR_DATE, LUNAR_MAX_SOLAR_DATE } from '@/lib/lunar';
 type CalendarEvent = { contact: ContactDTO; occurrence: BirthdayOccurrence };
 export function BirthdayCalendar({ workspace }: { workspace: Workspace }) {
   const today = localDate(new Date(), workspace.timeZone);
@@ -50,11 +51,22 @@ export function BirthdayCalendar({ workspace }: { workspace: Workspace }) {
   );
   const events: CalendarEvent[] = [];
   const errors: string[] = [];
+  const lunarStart =
+    start < LUNAR_MIN_SOLAR_DATE ? LUNAR_MIN_SOLAR_DATE : start;
+  const lunarEnd = end > LUNAR_MAX_SOLAR_DATE ? LUNAR_MAX_SOLAR_DATE : end;
+  const partialLunarCoverage =
+    contacts.some((c) => c.birthdayType === 'LUNAR') &&
+    (start < LUNAR_MIN_SOLAR_DATE || end > LUNAR_MAX_SOLAR_DATE);
   contacts.forEach((contact) => {
     try {
-      BirthdayService.between(contact, start, end, workspace.timeZone).forEach(
-        (occurrence) => events.push({ contact, occurrence }),
-      );
+      const lunar = contact.birthdayType === 'LUNAR';
+      if (lunar && lunarStart > lunarEnd) return;
+      BirthdayService.between(
+        contact,
+        lunar ? lunarStart : start,
+        lunar ? lunarEnd : end,
+        workspace.timeZone,
+      ).forEach((occurrence) => events.push({ contact, occurrence }));
     } catch {
       errors.push(contact.name);
     }
@@ -139,7 +151,7 @@ export function BirthdayCalendar({ workspace }: { workspace: Workspace }) {
             value={year}
             onChange={(e) => changeMonth(+e.target.value, month)}
           >
-            {Array.from({ length: 201 }, (_, i) => (
+            {Array.from({ length: 202 }, (_, i) => (
               <option key={i} value={1900 + i}>
                 {1900 + i} 年
               </option>
@@ -181,8 +193,14 @@ export function BirthdayCalendar({ workspace }: { workspace: Workspace }) {
             ))}
           </Select>
         </div>
+        {partialLunarCoverage && (
+          <div className="notification-inline" role="status">
+            农历生日仅显示 {LUNAR_MIN_SOLAR_DATE} 至 {LUNAR_MAX_SOLAR_DATE}{' '}
+            范围内的日期，超出部分不参与显示。
+          </div>
+        )}
         {errors.length > 0 && (
-          <div className="notification-inline danger-text">
+          <div className="notification-inline danger-text" role="alert">
             {errors.length}{' '}
             位联系人在所选日期范围内无法换算，请前往联系人详情检查生日：
             {errors.join('、')}。

@@ -68,6 +68,7 @@ export async function sendEmail(
         props.body,
         ...(props.details || []).map((d) => `${d.label}：${d.value}`),
         props.url || '',
+        props.footer || '',
       ].join('\n\n'),
       ...(messageId ? { messageId } : {}),
     });
@@ -171,6 +172,41 @@ export function sendBirthdayReminderEmail(
     options,
   );
 }
+export type BirthdayGreetingEmail = Pick<
+  BirthdayEmail,
+  | 'userId'
+  | 'recipient'
+  | 'contactId'
+  | 'contactName'
+  | 'birthdayDate'
+  | 'queueId'
+  | 'messageId'
+> & {
+  senderName: string;
+  message: string;
+};
+export function sendBirthdayGreetingEmail(
+  data: BirthdayGreetingEmail,
+  options: { log?: boolean } = {},
+) {
+  return sendEmail(
+    {
+      userId: data.userId,
+      recipient: data.recipient,
+      queueId: data.queueId,
+      messageId: data.messageId,
+      template: 'BIRTHDAY_GREETING',
+      subject: data.contactName + '，生日快乐！',
+      heading: data.contactName + '，生日快乐！',
+      body: data.message,
+      details: [{ label: '来自', value: data.senderName }],
+      footer:
+        '这封生日祝福由发送者通过 BdayMate 安排。如不希望继续收到，请联系发送者关闭自动祝福。',
+    },
+    options,
+  );
+}
+
 export async function sendTestEmail(user: { id: string; email: string }) {
   const subject = 'BdayMate 测试邮件';
   // Persist before verify, so configuration/connection failures are visible and rate-limited.
@@ -217,5 +253,6 @@ export const EmailService = {
   sendVerificationEmail,
   sendPasswordResetEmail,
   sendBirthdayReminderEmail,
+  sendBirthdayGreetingEmail,
   sendTestEmail,
 };

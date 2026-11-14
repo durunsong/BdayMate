@@ -5,6 +5,11 @@ export const LUNAR_MIN_YEAR = 1900;
 export const LUNAR_MAX_YEAR = 2100;
 export const LUNAR_MIN_SOLAR_DATE = '1900-01-31';
 export const LUNAR_MAX_SOLAR_DATE = '2101-01-28';
+// HKO's published 2057 table starts month 9 one day before lunar-javascript.
+// Keep both conversion directions and month-length validation on that baseline.
+// https://www.hko.gov.hk/en/gts/time/calendar/text/files/T2057e.txt
+const HKO_2057_MONTH_9_START = Date.UTC(2057, 8, 28);
+const DAY_MS = 86_400_000;
 export type LunarDate = {
   year: number;
   month: number;
@@ -44,6 +49,10 @@ export function lunarMonthDays(
   ) {
     throw new RangeError('Invalid lunar month.');
   }
+  if (year === 2057 && !isLeapMonth) {
+    if (month === 8) return 29;
+    if (month === 9) return 30;
+  }
   return (
     LunarMonth.fromYm(year, isLeapMonth ? -month : month)?.getDayCount() ?? null
   );
@@ -58,6 +67,11 @@ export function lunarToSolar(
   const days = lunarMonthDays(year, month, isLeapMonth);
   if (days === null || !Number.isInteger(day) || day < 1 || day > days) {
     throw new RangeError('The source lunar date does not exist.');
+  }
+  if (year === 2057 && month === 9 && !isLeapMonth) {
+    return new Date(HKO_2057_MONTH_9_START + (day - 1) * DAY_MS)
+      .toISOString()
+      .slice(0, 10);
   }
   return Lunar.fromYmd(year, isLeapMonth ? -month : month, day)
     .getSolar()
@@ -76,6 +90,14 @@ export function lunarFromSolar(date: string): LunarDate {
     );
   }
   assertLunarSolarRange(date);
+  if (date >= '2057-09-28' && date <= '2057-10-27') {
+    return {
+      year: 2057,
+      month: 9,
+      day: (parsed.getTime() - HKO_2057_MONTH_9_START) / DAY_MS + 1,
+      isLeapMonth: false,
+    };
+  }
   const lunar = Solar.fromYmd(
     parsed.getUTCFullYear(),
     parsed.getUTCMonth() + 1,

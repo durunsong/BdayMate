@@ -6,7 +6,7 @@ Follow the workspace and personal_code rules. User authorizes building this new 
 - Source of requirements: docs/requirements.md; plan/progress: openspec/changes/build-bdaymate/.
 - Every business operation scopes by authenticated userId; composite ownership foreign keys protect contact/tag/gift associations. Never accept userId from client.
 - Birthday calculations are civil dates in user's IANA timezone; queue timestamps UTC. SOLAR Feb 29 defaults Feb 28; LUNAR missing leap month defaults regular month and short months clamp to last day; both policies explicit/editable. Lunar supported interval must be enforced and documented.
-- Email recipients are account owners, never contacts. Queue uses atomic SQL claim, unique dedupeKey, bounded retries. SMTP lacks universal exactly-once guarantees: ambiguous accepted sends require review, not blind retry.
+- Self-reminder recipients are account owners. User-authorized birthday greetings may target the current contact email only after explicit per-contact opt-in; keep private notes/age/relationship/account links out of greeting content. Queue uses atomic SQL claim, unique dedupeKey, bounded retries. SMTP lacks universal exactly-once guarantees: ambiguous accepted sends require review, not blind retry.
 - Credentials only in ignored local environment files; never log URLs/secrets. SMTP placeholders are not valid credentials. Tests use local SMTP capture; external delivery awaits user configuration.
 - Commands: pnpm test:unit, pnpm test:integration, pnpm test:e2e, pnpm lint, pnpm typecheck, pnpm build. Verify commands before claiming pass.
 - UTF-8 without BOM; preserve LICENSE. All deliberate deviations and remaining acceptance gates belong in docs/progress.md.

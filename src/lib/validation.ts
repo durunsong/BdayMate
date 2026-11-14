@@ -160,3 +160,10 @@ export const contactReminderSchema = z.object({
   daysBefore: reminderFields.daysBefore,
   sendTime: reminderFields.sendTime,
 });
+
+export const contactGreetingSchema = z.object({
+  contactId: idSchema,
+  enabled: z.boolean(),
+  sendTime: reminderFields.sendTime,
+  message: z.string().trim().min(1, '请输入生日祝福').max(3000),
+});

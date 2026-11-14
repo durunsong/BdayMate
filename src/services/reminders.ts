@@ -10,7 +10,13 @@ import {
   localDate,
   type BirthdayInput,
 } from './birthday';
-import { sendBirthdayReminderEmail, type BirthdayEmail } from './email';
+import {
+  sendBirthdayReminderEmail,
+  sendBirthdayGreetingEmail,
+  type BirthdayEmail,
+  type BirthdayGreetingEmail,
+} from './email';
+import { z } from 'zod';
 
 /** Repeated wall times use the earlier instant; gaps advance by the gap length. */
 export function reminderInstant(
@@ -58,7 +64,7 @@ const UNCERTAIN =
 const userInclude = {
   profile: true,
   reminderPreference: true,
-  contacts: { include: { reminderSetting: true } },
+  contacts: { include: { reminderSetting: true, greetingSetting: true } },
 } as const;
 type ReminderUser = Prisma.UserGetPayload<{ include: typeof userInclude }>;
 type ReminderPayload = Pick<
@@ -70,13 +76,18 @@ type ReminderPayload = Pick<
   | 'age'
   | 'notes'
 > & { sendDate: string };
+type GreetingPayload = Pick<
+  BirthdayGreetingEmail,
+  'contactName' | 'birthdayDate' | 'senderName' | 'message'
+> & { sendDate: string };
+const birthdayTemplates = ['BIRTHDAY', 'BIRTHDAY_GREETING'];
 type PlannedReminder = {
   userId: string;
   contactId: string;
   recipient: string;
   template: string;
   subject: string;
-  payload: ReminderPayload;
+  payload: ReminderPayload | GreetingPayload;
   scheduledAt: Date;
   dedupeKey: string;
 };
@@ -94,18 +105,23 @@ function planReminders(
   now: Date,
 ): Map<string, PlannedReminder> {
   const plans = new Map<string, PlannedReminder>();
-  if (!user.emailVerified || user.reminderPreference?.emailEnabled === false)
-    return plans;
+  if (!user.emailVerified) return plans;
   const timeZone = user.profile?.timeZone || 'Asia/Shanghai';
   const today = localDate(now, timeZone);
   const lastSendDate = addDaysToDate(today, 45);
   for (const contact of user.contacts) {
-    if (contact.archivedAt || contact.reminderSetting?.enabled === false)
-      continue;
+    if (contact.archivedAt) continue;
+    const selfEnabled =
+      user.reminderPreference?.emailEnabled !== false &&
+      contact.reminderSetting?.enabled !== false;
+    const greeting = contact.greetingSetting;
+    const greetingEnabled =
+      greeting?.enabled && z.email().safeParse(contact.email).success;
+    if (!selfEnabled && !greetingEnabled) continue;
     const setting = contact.reminderSetting || user.reminderPreference;
-    const days = setting?.daysBefore ?? [7, 3, 1, 0];
+    const days = selfEnabled ? (setting?.daysBefore ?? [7, 3, 1, 0]) : [];
     if (
-      !days.length ||
+      (selfEnabled && !days.length) ||
       days.length > 12 ||
       days.some((day) => !Number.isInteger(day) || day < 0 || day > 45)
     ) {
@@ -125,13 +141,37 @@ function planReminders(
     const occurrences = BirthdayService.between(
       birthday,
       today,
-      addDaysToDate(lastSendDate, Math.max(...days)),
+      addDaysToDate(lastSendDate, Math.max(0, ...days)),
       timeZone,
     );
     for (const occurrence of occurrences) {
+      if (greetingEnabled && greeting && occurrence.date <= lastSendDate) {
+        const dedupeKey =
+          'greeting:' + user.id + ':' + contact.id + ':' + occurrence.date;
+        plans.set(dedupeKey, {
+          userId: user.id,
+          contactId: contact.id,
+          recipient: contact.email!,
+          template: 'BIRTHDAY_GREETING',
+          subject: contact.name + '，生日快乐！',
+          payload: {
+            contactName: contact.name,
+            birthdayDate: occurrence.date,
+            sendDate: occurrence.date,
+            senderName: user.name,
+            message: greeting.message,
+          },
+          scheduledAt: reminderInstant(
+            occurrence.date,
+            greeting.sendTime,
+            timeZone,
+          ),
+          dedupeKey,
+        });
+      }
       for (const daysBefore of new Set(days)) {
         const sendDate = addDaysToDate(occurrence.date, -daysBefore);
-        if (sendDate > lastSendDate) continue;
+        if (sendDate < today || sendDate > lastSendDate) continue;
         const dedupeKey = `birthday:${user.id}:${contact.id}:${occurrence.date}:${daysBefore}`;
         plans.set(dedupeKey, {
           userId: user.id,
@@ -177,14 +217,14 @@ export async function syncUserReminders(
   if (!user) return 0;
   const plans = planReminders(user, now);
   const existing = await tx.emailQueue.findMany({
-    where: { userId, template: 'BIRTHDAY' },
+    where: { userId, template: { in: birthdayTemplates } },
   });
   const known = new Set(existing.map((job) => job.dedupeKey));
   const updates: {
     id: string;
     recipient: string;
     subject: string;
-    payload: ReminderPayload;
+    payload: ReminderPayload | GreetingPayload;
     scheduledAt: string;
     status: 'PENDING' | 'FAILED';
     lastError: string | null;
@@ -325,7 +365,7 @@ async function quarantineExpiredClaims(
   const expired = await db.emailQueue.findMany({
     where: {
       ...(userId ? { userId } : {}),
-      template: 'BIRTHDAY',
+      template: { in: birthdayTemplates },
       status: 'PROCESSING',
       OR: [{ lockedAt: { lte: cutoff } }, { lockedAt: null }],
     },
@@ -385,7 +425,7 @@ async function claimDueJob(
   const rows = await db.$queryRaw<Claim[]>`
     WITH due AS (
       SELECT id FROM bday_email_queue
-      WHERE template = 'BIRTHDAY' AND status IN ('PENDING', 'FAILED') AND "attemptCount" < ${MAX_ATTEMPTS}
+      WHERE template IN ('BIRTHDAY', 'BIRTHDAY_GREETING') AND status IN ('PENDING', 'FAILED') AND "attemptCount" < ${MAX_ATTEMPTS}
         AND "scheduledAt" <= ${now} AND (${userId ?? null}::text IS NULL OR "userId" = ${userId ?? null})
         AND ("lastError" IS NULL OR ("lastError" NOT LIKE 'CANCELLED:%' AND "lastError" NOT LIKE 'DELIVERY_UNCERTAIN:%'))
       ORDER BY "scheduledAt", id FOR UPDATE SKIP LOCKED LIMIT 1
@@ -398,7 +438,7 @@ async function claimDueJob(
 
 async function deliverClaim(
   claim: Claim,
-  now: Date,
+  clock: () => Date,
 ): Promise<'sent' | 'failed' | 'skipped'> {
   // This same lock serializes contact/settings edits with the external SMTP send.
   // SMTP and DB are not a distributed transaction: accepted-but-uncommitted jobs
@@ -419,6 +459,9 @@ async function deliverClaim(
         where: { id: claim.userId },
         include: userInclude,
       });
+      // Read after lock acquisition and database reads: another send or lock
+      // wait can cross the account's midnight while this batch is running.
+      const now = clock();
       const planned = user && planReminders(user, now).get(job.dedupeKey);
       const claimedWhere = {
         id: claim.id,
@@ -459,25 +502,27 @@ async function deliverClaim(
       const daysBefore =
         (Date.parse(planned.payload.birthdayDate) - Date.parse(today)) /
         86_400_000;
-      const subject =
-        daysBefore === 0
-          ? `今天是 ${planned.payload.contactName} 的生日`
-          : `${planned.payload.contactName} 的生日还有 ${daysBefore} 天`;
+      const subject = planned.subject;
       const messageId = `<bdaymate-${createHash('sha256').update(job.dedupeKey).digest('hex')}@bdaymate.local>`;
       let result: { messageId: string };
       try {
-        result = await sendBirthdayReminderEmail(
-          {
-            ...planned.payload,
-            daysBefore,
-            userId: job.userId,
-            recipient: user.email,
-            contactId: planned.contactId,
-            queueId: job.id,
-            messageId,
-          },
-          { log: false },
-        );
+        const envelope = {
+          userId: job.userId,
+          recipient: planned.recipient,
+          contactId: planned.contactId,
+          queueId: job.id,
+          messageId,
+        };
+        result =
+          'daysBefore' in planned.payload
+            ? await sendBirthdayReminderEmail(
+                { ...planned.payload, ...envelope, daysBefore },
+                { log: false },
+              )
+            : await sendBirthdayGreetingEmail(
+                { ...planned.payload, ...envelope },
+                { log: false },
+              );
       } catch (error) {
         const lastError = definitelyRejected(error)
           ? safeError(error)
@@ -487,7 +532,7 @@ async function deliverClaim(
           data: {
             status: 'FAILED',
             lastError,
-            recipient: user.email,
+            recipient: planned.recipient,
             subject,
             payload: planned.payload,
             scheduledAt: new Date(
@@ -501,7 +546,7 @@ async function deliverClaim(
           data: {
             userId: job.userId,
             queueId: job.id,
-            recipient: user.email,
+            recipient: planned.recipient,
             subject,
             template: job.template,
             status: 'FAILED',
@@ -515,7 +560,7 @@ async function deliverClaim(
         data: {
           status: 'SENT',
           sentAt: now,
-          recipient: user.email,
+          recipient: planned.recipient,
           subject,
           payload: planned.payload,
           lastError: null,
@@ -527,7 +572,7 @@ async function deliverClaim(
         data: {
           userId: job.userId,
           queueId: job.id,
-          recipient: user.email,
+          recipient: planned.recipient,
           subject,
           template: job.template,
           status: 'SENT',
@@ -544,7 +589,8 @@ async function deliverClaim(
 export async function processEmailQueue(
   options: { userId?: string; now?: Date; limit?: number } = {},
 ): Promise<{ sent: number; failed: number; processed: number }> {
-  const now = options.now ?? new Date();
+  const clock = options.now ? () => options.now! : () => new Date();
+  const now = clock();
   const limit = options.limit ?? 25;
   if (!Number.isInteger(limit) || limit < 1 || limit > 100)
     throw new DomainError('单次队列处理数量必须在 1–100 之间');
@@ -552,9 +598,9 @@ export async function processEmailQueue(
   await quarantineExpiredClaims(now, limit, options.userId);
   const result = { sent: 0, failed: 0, processed: 0 };
   for (let i = 0; i < limit; i++) {
-    const job = await claimDueJob(now, options.userId);
+    const job = await claimDueJob(clock(), options.userId);
     if (!job) break;
-    const status = await deliverClaim(job, now);
+    const status = await deliverClaim(job, clock);
     if (status !== 'skipped') {
       result[status]++;
       result.processed++;
@@ -571,7 +617,7 @@ export async function retryFailedEmail(
     async (tx) => {
       await lockUser(tx, userId);
       const job = await tx.emailQueue.findFirst({
-        where: { id, userId, template: 'BIRTHDAY' },
+        where: { id, userId, template: { in: birthdayTemplates } },
       });
       if (!job) throw new DomainError('邮件任务不存在或无权访问', 404);
       if (

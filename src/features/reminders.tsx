@@ -21,6 +21,7 @@ import {
   PageHeading,
   Panel,
   Select,
+  Textarea,
 } from '@/components/ui';
 import type { ContactDTO, Workspace } from '@/lib/types';
 import { useAction } from '@/features/use-action';
@@ -88,7 +89,7 @@ export function PreferencesForm({ workspace }: { workspace: Workspace }) {
     <form onSubmit={save}>
       <div className="switch-row">
         <div>
-          <h3>邮件生日提醒</h3>
+          <h3>提醒我准备生日</h3>
           <p>将提醒发送至 {workspace.user.email}</p>
         </div>
         <button
@@ -107,7 +108,7 @@ export function PreferencesForm({ workspace }: { workspace: Workspace }) {
         <Field
           id="reminder-days"
           label="提前提醒天数"
-          hint="用逗号分隔，0 表示生日当天，例如 7,3,1,0"
+          hint="用逗号分隔，0 表示生日当天提醒自己，例如 7,3,1,0"
         >
           <Input
             id="reminder-days"
@@ -176,6 +177,9 @@ export function ContactReminderForm({
         }
       }}
     >
+      <p className="field-hint" style={{ marginBottom: 14 }}>
+        提醒发送给你本人：{workspace.user.email}，不会发给联系人。
+      </p>
       <label className="checkbox-label">
         <input
           type="checkbox"
@@ -187,7 +191,7 @@ export function ContactReminderForm({
       {global ? (
         <div className="notice" style={{ marginTop: 14 }}>
           提前 {workspace.preference.daysBefore.join('、')} 天，
-          {workspace.preference.sendTime} 提醒。0 表示生日当天。
+          {workspace.preference.sendTime} 提醒自己。0 表示生日当天提醒自己。
         </div>
       ) : (
         <div className="stack-sm" style={{ marginTop: 14 }}>
@@ -241,6 +245,169 @@ export function ContactReminderForm({
     </form>
   );
 }
+export function ContactGreetingForm({
+  contact,
+  workspace,
+}: {
+  contact: ContactDTO;
+  workspace: Workspace;
+}) {
+  const [enabled, setEnabled] = useState(
+    contact.greetingSetting?.enabled ?? false,
+  );
+  const [message, setMessage] = useState(
+    contact.greetingSetting?.message ??
+      '生日快乐！愿你新的一岁平安喜乐，所愿皆成。',
+  );
+  const [error, setError] = useState('');
+  const [saved, setSaved] = useState(false);
+  const { run, pending } = useAction();
+  const unavailable = !contact.email || !!contact.archivedAt;
+  return (
+    <form
+      className="inline-form"
+      aria-label="自动生日祝福"
+      onChange={() => {
+        setSaved(false);
+        setError('');
+      }}
+      onSubmit={async (event) => {
+        event.preventDefault();
+        if (unavailable || pending) return;
+        setSaved(false);
+        const content = message.trim();
+        if (!content || content.length > 3000) {
+          setError('请输入 1–3000 字的生日祝福');
+          return;
+        }
+        setError('');
+        const data = new FormData(event.currentTarget);
+        const result = await run('saveContactGreeting', {
+          contactId: contact.id,
+          enabled,
+          sendTime: data.get('sendTime'),
+          message: content,
+        });
+        if (result.ok) {
+          setMessage(content);
+          setSaved(true);
+        } else setError(result.message);
+      }}
+    >
+      <div className="switch-row">
+        <div>
+          <h3>生日当天，替你送出祝福</h3>
+          <p>需要单独开启，不受“提醒自己”的开关影响。</p>
+        </div>
+        <button
+          type="button"
+          className="switch"
+          role="switch"
+          aria-checked={enabled && !unavailable}
+          aria-label="开启自动生日祝福"
+          onClick={() => {
+            setEnabled((value) => !value);
+            setSaved(false);
+            setError('');
+          }}
+          disabled={pending || unavailable}
+        >
+          <span />
+        </button>
+      </div>
+      <div className="stack-sm">
+        <p className="small muted" style={{ overflowWrap: 'anywhere' }}>
+          收件人：<span>{contact.email || '尚未填写邮箱'}</span>
+          <br />
+          发送时区：<span>{workspace.timeZone}</span>
+          <br />
+          署名：{workspace.user.name}
+        </p>
+        {!contact.email && (
+          <div className="notice warm">
+            <p>
+              先填写联系人邮箱，再开启自动祝福。{' '}
+              <Link
+                className="text-link"
+                style={{ color: 'var(--primary-dark)' }}
+                href={`/contacts/${contact.id}/edit`}
+              >
+                填写联系人邮箱
+              </Link>
+            </p>
+          </div>
+        )}
+        {contact.archivedAt && (
+          <p className="notice warm">
+            这位联系人已归档，自动祝福已暂停。恢复联系人后可重新设置。
+          </p>
+        )}
+        <Field
+          id="greeting-time"
+          label="祝福发送时间"
+          hint="按上方账户时区发送"
+        >
+          <Input
+            id="greeting-time"
+            name="sendTime"
+            type="time"
+            required
+            disabled={pending || unavailable}
+            defaultValue={contact.greetingSetting?.sendTime ?? '09:00'}
+          />
+        </Field>
+        <Field
+          id="greeting-message"
+          label="生日祝福内容"
+          hint="1–3000 字，会直接发送给联系人"
+        >
+          <Textarea
+            id="greeting-message"
+            name="message"
+            required
+            maxLength={3000}
+            rows={5}
+            disabled={pending || unavailable}
+            value={message}
+            aria-invalid={!!error}
+            onChange={(event) => setMessage(event.target.value)}
+          />
+        </Field>
+        <p className="field-hint">
+          每年按{contact.birthdayType === 'LUNAR' ? '农历' : '公历'}
+          生日与上方庆祝规则，在生日当天重复发送。关闭此开关、移除邮箱或归档联系人会停止发送。
+        </p>
+        <p className="field-hint">
+          邮件仅包含联系人称呼、这段祝福和你的昵称，不会自动添加年龄、关系、内部备注或私有链接。请确认内容适合直接发送。
+        </p>
+        <p className="field-hint">
+          需已配置邮件通道并启用后台调度；到达设定时间后由服务器发送，可能有延迟。
+        </p>
+        {error && (
+          <p className="field-error" role="alert">
+            {error}
+          </p>
+        )}
+        {saved && (
+          <p className="field-hint" role="status">
+            生日祝福设置已保存
+          </p>
+        )}
+      </div>
+      <div className="form-actions">
+        <Button
+          size="sm"
+          type="submit"
+          loading={pending}
+          disabled={unavailable}
+        >
+          <Save size={15} />
+          保存生日祝福设置
+        </Button>
+      </div>
+    </form>
+  );
+}
 export function ReminderManagement({ workspace }: { workspace: Workspace }) {
   const { run, pending } = useAction();
   const [tab, setTab] = useState('queue');
@@ -279,7 +446,7 @@ export function ReminderManagement({ workspace }: { workspace: Workspace }) {
     <>
       <PageHeading
         title="重要的日子，我们提前说"
-        description="设好提醒，关掉浏览器也不会错过。邮件只会发送给你本人。"
+        description="给自己的提前提醒和给联系人的当天祝福，分别设置。"
       >
         <Button
           variant="secondary"
@@ -338,7 +505,7 @@ export function ReminderManagement({ workspace }: { workspace: Workspace }) {
               {workspace.preference.daysBefore.map((day) => (
                 <div className="reminder-day" key={day}>
                   <strong>{day === 0 ? '当天' : day}</strong>
-                  <span>{day === 0 ? '生日祝福' : '天前提醒'}</span>
+                  <span>{day === 0 ? '提醒自己' : '天前提醒'}</span>
                 </div>
               ))}
             </div>
@@ -351,16 +518,17 @@ export function ReminderManagement({ workspace }: { workspace: Workspace }) {
               <div className="notice">
                 <CheckCircle2 size={16} />
                 <p>
-                  联系人可以设置独立的提醒节奏。打开联系人详情，在“生日提醒”中自定义。
+                  这些提醒只发给你本人，0
+                  表示生日当天提醒自己。打开联系人详情，在“提醒自己”中自定义提醒节奏。
                 </p>
               </div>
               <Link className="text-link" href="/contacts">
-                为特别的人单独设置提醒 →
+                设置联系人提醒与自动祝福 →
               </Link>
               <div className="notice warm">
                 <Settings size={16} />
                 <p>
-                  未来提醒由服务器计划任务生成，发送失败会有限次重试。投递结果不明确的邮件需检查日志后处理。
+                  需已配置邮件通道并启用后台调度，关闭浏览器后才可继续发送；调度或邮件投递可能延迟。发送失败会有限次重试，投递结果不明确时需检查日志后处理。
                 </p>
               </div>
             </div>

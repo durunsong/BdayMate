@@ -39,6 +39,11 @@ export type ContactDTO = {
   tags: TagDTO[];
   next: { date: string; daysUntil: number; age: number | null } | null;
   birthdayError?: string;
+  greetingSetting: {
+    enabled: boolean;
+    sendTime: string;
+    message: string;
+  } | null;
   reminderSetting: {
     enabled: boolean;
     daysBefore: number[];

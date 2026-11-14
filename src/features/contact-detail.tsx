@@ -11,6 +11,7 @@ import {
   ExternalLink,
   Gift,
   Heart,
+  Mail,
   Pencil,
   Plus,
   RotateCcw,
@@ -38,7 +39,7 @@ import {
   type Workspace,
 } from '@/lib/types';
 import { birthdayLabel, shortDate } from '@/features/contact-display';
-import { ContactReminderForm } from '@/features/reminders';
+import { ContactGreetingForm, ContactReminderForm } from '@/features/reminders';
 import { defaultWishes } from '@/features/wishes';
 import { useAction } from '@/features/use-action';
 const giftStates = {
@@ -129,7 +130,7 @@ export function ContactDetail({
           <Archive size={19} />
           <div>
             <strong>这位联系人已归档</strong>
-            <p>生日记录会保留，恢复后可继续安排生日提醒。</p>
+            <p>生日记录会保留，提醒与自动祝福已暂停；恢复后可继续安排。</p>
           </div>
         </div>
       )}
@@ -350,10 +351,17 @@ export function ContactDetail({
         <div className="stack">
           <Panel>
             <div className="panel-heading">
-              <h2>生日提醒</h2>
+              <h2>提醒自己</h2>
               <Bell size={17} className="muted" />
             </div>
             <ContactReminderForm workspace={workspace} contact={contact} />
+          </Panel>
+          <Panel>
+            <div className="panel-heading">
+              <h2>自动生日祝福</h2>
+              <Mail size={17} className="muted" />
+            </div>
+            <ContactGreetingForm workspace={workspace} contact={contact} />
           </Panel>
           <Panel>
             <div className="panel-heading">
