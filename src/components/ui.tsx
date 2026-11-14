@@ -40,12 +40,13 @@ export function Button({
     <Comp
       className={cn(buttonVariants({ variant, size }), className)}
       disabled={disabled || loading}
+      aria-busy={loading || undefined}
       {...props}
     >
       {loading ? (
         <>
-          <LoaderCircle size={17} className="spin" />
-          <span>{children}</span>
+          <LoaderCircle size={17} className="spin button-spinner" aria-hidden />
+          <span className="button-loading-content">{children}</span>
         </>
       ) : (
         children

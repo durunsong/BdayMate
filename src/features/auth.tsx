@@ -1,7 +1,7 @@
 'use client';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
-import { useState, type ReactNode } from 'react';
+import { useProgressRouter as useRouter } from '@/lib/navigation';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { z } from 'zod';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -13,12 +13,17 @@ import {
   Eye,
   EyeOff,
   Heart,
+  Mail,
+  ExternalLink,
+  RefreshCw,
   ShieldCheck,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { Brand } from '@/components/app-shell';
 import { Button, Field, FormMessage, Input } from '@/components/ui';
 import { authClient } from '@/lib/auth-client';
+import { ThemeToggle } from '@/components/theme-provider';
+import './auth.css';
 type AuthMode = 'login' | 'register' | 'forgot' | 'reset' | 'verify';
 const labels = {
   login: {
@@ -43,7 +48,7 @@ const labels = {
   },
   verify: {
     title: '确认是你的邮箱',
-    description: '请打开验证邮件中的链接，完成验证后即可使用。',
+    description: '还差一次点击，就能开始记住重要的日子。',
     button: '重新发送验证邮件',
   },
 };
@@ -71,8 +76,11 @@ export function authErrorMessage(error: {
 export function AuthLayout({ children }: { children: ReactNode }) {
   return (
     <div className="auth-page">
+      <div className="auth-theme-control">
+        <ThemeToggle />
+      </div>
       <aside className="auth-story">
-        <Brand />
+        <Brand href="/" />
         <div className="auth-story-body">
           <h1>
             有些日子，
@@ -104,7 +112,7 @@ export function AuthLayout({ children }: { children: ReactNode }) {
       </aside>
       <main className="auth-main">
         <div className="auth-mobile-brand">
-          <Brand />
+          <Brand href="/" />
         </div>
         {children}
         <div className="auth-assurance">
@@ -129,12 +137,54 @@ export function AuthForm({
   errorCode?: string;
 }) {
   const [pending, setPending] = useState(false);
+  const submitting = useRef(false);
+  const [checking, setChecking] = useState(false);
+  const [confirmed, setConfirmed] = useState(false);
+  const [checkMessage, setCheckMessage] = useState('');
+  const [cooldown, setCooldown] = useState(
+    mode === 'verify' && email && !errorCode ? 60 : 0,
+  );
   const [visible, setVisible] = useState(false);
   const [message, setMessage] = useState(
     errorCode ? '验证链接已失效，请重新发送验证邮件。' : '',
   );
   const [sent, setSent] = useState(false);
   const router = useRouter();
+  const cooldownActive = cooldown > 0;
+  useEffect(() => {
+    if (!cooldownActive) return;
+    const expiresAt = Date.now() + 60_000;
+    const timer = window.setInterval(
+      () =>
+        setCooldown(Math.max(0, Math.ceil((expiresAt - Date.now()) / 1000))),
+      1000,
+    );
+    return () => window.clearInterval(timer);
+  }, [cooldownActive]);
+  async function checkVerification() {
+    if (checking) return;
+    setChecking(true);
+    setCheckMessage('');
+    try {
+      const result = await authClient.getSession();
+      if (result.error) {
+        setCheckMessage('暂时无法检查，请稍后重试。');
+      } else if (
+        result.data?.user.emailVerified &&
+        (!email || result.data.user.email.toLowerCase() === email.toLowerCase())
+      ) {
+        setConfirmed(true);
+      } else {
+        setCheckMessage(
+          '还没有确认到验证结果。请先点击邮件里的「验证邮箱」；如果在其他浏览器完成，请返回登录。',
+        );
+      }
+    } catch {
+      setCheckMessage('网络连接失败，请稍后再次检查。');
+    } finally {
+      setChecking(false);
+    }
+  }
   const schema = z
     .object({
       email: mode === 'reset' ? z.string() : z.email('请输入有效的邮箱地址'),
@@ -178,6 +228,8 @@ export function AuthForm({
     },
   });
   async function submit(data: Values) {
+    if (submitting.current || (mode === 'verify' && cooldown > 0)) return;
+    submitting.current = true;
     setPending(true);
     setMessage('');
     try {
@@ -202,7 +254,7 @@ export function AuthForm({
           name: data.name,
           email: data.email,
           password: data.password,
-          callbackURL: '/verify-email?verified=1',
+          callbackURL: '/verify-email',
         });
         if (result.error) {
           setMessage(authErrorMessage(result.error));
@@ -233,25 +285,43 @@ export function AuthForm({
       } else {
         const result = await authClient.sendVerificationEmail({
           email: data.email,
-          callbackURL: '/verify-email?verified=1',
+          callbackURL: '/verify-email',
         });
         if (result.error) {
           setMessage(authErrorMessage(result.error));
+          if (result.error.code === 'TOO_MANY_REQUESTS') setCooldown(60);
           return;
         }
         setSent(true);
+        setCooldown(60);
       }
     } catch {
       setMessage('网络连接失败，请稍后重试。');
     } finally {
+      submitting.current = false;
       setPending(false);
     }
   }
   const text = labels[mode];
-  if (mode === 'verify' && verified && !errorCode)
+  const inboxProviders: Record<string, { name: string; url: string }> = {
+    'gmail.com': { name: 'Gmail', url: 'https://mail.google.com/' },
+    'googlemail.com': { name: 'Gmail', url: 'https://mail.google.com/' },
+    'outlook.com': { name: 'Outlook', url: 'https://outlook.live.com/mail/' },
+    'hotmail.com': { name: 'Outlook', url: 'https://outlook.live.com/mail/' },
+    'live.com': { name: 'Outlook', url: 'https://outlook.live.com/mail/' },
+    'qq.com': { name: 'QQ 邮箱', url: 'https://mail.qq.com/' },
+    'foxmail.com': { name: 'QQ 邮箱', url: 'https://mail.qq.com/' },
+    '163.com': { name: '网易邮箱', url: 'https://mail.163.com/' },
+    '126.com': { name: '网易邮箱', url: 'https://mail.126.com/' },
+    'icloud.com': { name: 'iCloud 邮箱', url: 'https://www.icloud.com/mail/' },
+  };
+  const inbox = inboxProviders[email.trim().toLowerCase().split('@')[1]];
+  if (mode === 'verify' && (verified || confirmed) && (!errorCode || confirmed))
     return (
       <div className="auth-form">
-        <CheckCircle2 size={45} color="#68a783" style={{ marginBottom: 22 }} />
+        <div className="auth-mail-symbol auth-mail-confirmed">
+          <CheckCircle2 size={28} />
+        </div>
         <h1>邮箱验证成功</h1>
         <p className="auth-subtitle">
           你的生日空间已经准备好，开始记住重要的人吧。
@@ -266,11 +336,67 @@ export function AuthForm({
     );
   return (
     <div className="auth-form">
+      {mode === 'verify' && (
+        <div className="auth-mail-symbol">
+          <Mail size={28} />
+        </div>
+      )}
       <h1>{text.title}</h1>
       <p className="auth-subtitle">{text.description}</p>
+      {mode === 'verify' && (
+        <div className="auth-verification-guide">
+          {email && (
+            <p className="auth-destination">
+              验证邮件会发往<strong>{email}</strong>
+            </p>
+          )}
+          <ol className="auth-verification-steps">
+            <li>
+              <span>1</span>
+              <div>
+                <strong>去收件箱找一封来信</strong>
+                <p>查找「验证你的 BdayMate 邮箱」，也看看垃圾邮件文件夹。</p>
+              </div>
+            </li>
+            <li>
+              <span>2</span>
+              <div>
+                <strong>点击邮件里的「验证邮箱」</strong>
+                <p>链接会带你回到这里，确认后就能进入生日搭子。</p>
+              </div>
+            </li>
+          </ol>
+          {inbox ? (
+            <Button asChild>
+              <a href={inbox.url} target="_blank" rel="noopener noreferrer">
+                前往 {inbox.name} 收件箱
+                <ExternalLink size={16} />
+              </a>
+            </Button>
+          ) : (
+            <p className="auth-inbox-hint">
+              打开你的邮箱应用，完成上面两个小步骤。
+            </p>
+          )}
+          <Button
+            type="button"
+            variant="secondary"
+            loading={checking}
+            onClick={checkVerification}
+          >
+            <RefreshCw size={16} />
+            我已点击验证，检查状态
+          </Button>
+          {checkMessage && (
+            <p className="auth-check-message" role="status">
+              {checkMessage}
+            </p>
+          )}
+        </div>
+      )}
       <FormMessage message={message} />
       {sent && (
-        <div className="validation-success">
+        <div className="validation-success" role="status">
           {mode === 'forgot'
             ? '如果这个邮箱已注册，重置链接会发送到你的收件箱。请同时检查垃圾邮件文件夹。'
             : '如果邮箱尚未验证，新的验证链接会发送到你的收件箱。请检查收件箱和垃圾邮件。'}
@@ -285,7 +411,7 @@ export function AuthForm({
         </>
       ) : (
         <form
-          onSubmit={handleSubmit(submit)}
+          onSubmit={(event) => void handleSubmit(submit)(event)}
           className="auth-form-fields"
           noValidate
         >
@@ -300,7 +426,7 @@ export function AuthForm({
               />
             </Field>
           )}
-          {mode !== 'reset' && (
+          {mode !== 'reset' && (mode !== 'verify' || !email) && (
             <Field
               id="auth-email"
               label="邮箱地址"
@@ -379,11 +505,23 @@ export function AuthForm({
               </Link>
             </div>
           )}
-          <Button type="submit" loading={pending}>
-            {text.button}
-            <ArrowRight size={16} />
+          <Button
+            type="submit"
+            loading={pending}
+            variant={mode === 'verify' ? 'ghost' : 'primary'}
+            disabled={mode === 'verify' && cooldown > 0}
+          >
+            {mode === 'verify' && cooldown > 0
+              ? `重新发送（${cooldown} 秒后）`
+              : text.button}
+            {mode !== 'verify' && <ArrowRight size={16} />}
           </Button>
         </form>
+      )}
+      {mode === 'verify' && (
+        <p className="auth-email-help">
+          邮箱填错了？<Link href="/register">返回修改邮箱</Link>
+        </p>
       )}
       {mode === 'login' ? (
         <p className="auth-alternative">

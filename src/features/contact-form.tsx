@@ -1,6 +1,6 @@
 'use client';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { useProgressRouter as useRouter } from '@/lib/navigation';
 import { useForm, useWatch } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import {

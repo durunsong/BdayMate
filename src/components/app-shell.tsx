@@ -1,7 +1,8 @@
 'use client';
 import Link from 'next/link';
 import Image from 'next/image';
-import { usePathname, useRouter } from 'next/navigation';
+import { usePathname } from 'next/navigation';
+import { useProgressRouter as useRouter } from '@/lib/navigation';
 import {
   Bell,
   Cake,
@@ -29,6 +30,7 @@ import { useNavigation } from '@/stores/navigation';
 import { useAction } from '@/features/use-action';
 import { Avatar, Button } from '@/components/ui';
 import { cn } from '@/lib/utils';
+import { ThemeToggle } from '@/components/theme-provider';
 
 const navigation = [
   { href: '/dashboard', label: '生日概览', icon: LayoutDashboard },
@@ -38,13 +40,9 @@ const navigation = [
   { href: '/groups', label: '标签与分组', icon: Tags },
   { href: '/wishes', label: '祝福语', icon: Heart },
 ];
-export function Brand() {
+export function Brand({ href = '/dashboard' }: { href?: string }) {
   return (
-    <Link
-      href="/dashboard"
-      className="brand"
-      aria-label="BdayMate 生日搭子首页"
-    >
+    <Link href={href} className="brand" aria-label="BdayMate 生日搭子首页">
       <Image
         src="/brand/bdaymate-logo.png"
         alt=""
@@ -187,6 +185,7 @@ export function AppShell({
             </span>
           </div>
           <div className="topbar-actions">
+            <ThemeToggle />
             <Link href="/contacts" className="header-search">
               <Search size={17} />
               <span>查找联系人</span>

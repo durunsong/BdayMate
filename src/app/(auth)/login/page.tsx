@@ -1,4 +1,7 @@
 import { AuthForm } from '@/features/auth';
-export default function LoginPage() {
+import { currentUser } from '@/lib/session';
+import { redirect } from 'next/navigation';
+export default async function LoginPage() {
+  if (await currentUser()) redirect('/dashboard');
   return <AuthForm mode="login" />;
 }

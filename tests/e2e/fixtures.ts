@@ -1,4 +1,4 @@
-import { randomUUID } from 'node:crypto';
+import { randomInt, randomUUID } from 'node:crypto';
 import { config } from 'dotenv';
 import { PrismaNeon } from '@prisma/adapter-neon';
 import { PrismaPg } from '@prisma/adapter-pg';
@@ -18,7 +18,12 @@ export type OwnedAccount = {
 };
 
 export const test = base.extend<{ account: OwnedAccount }>({
-  account: async ({}, runFixture) => {
+  account: async ({ context }, runFixture) => {
+    // Independent simulated visitors keep the real auth limiter enabled without
+    // charging every isolated browser account to the same localhost address.
+    await context.setExtraHTTPHeaders({
+      'x-forwarded-for': '198.18.' + randomInt(256) + '.' + randomInt(1, 255),
+    });
     const email = 'test-e2e-' + randomUUID() + '@example.test';
     const connectionString = environment.DATABASE_URL;
     if (!connectionString)

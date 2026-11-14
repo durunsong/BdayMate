@@ -1,6 +1,6 @@
 'use client';
 import { useState, type FormEvent } from 'react';
-import { useRouter } from 'next/navigation';
+import { useProgressRouter as useRouter } from '@/lib/navigation';
 import {
   Bell,
   Database,

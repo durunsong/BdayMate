@@ -1,6 +1,6 @@
 'use client';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { useProgressRouter as useRouter } from '@/lib/navigation';
 import { useState, type FormEvent } from 'react';
 import {
   Archive,
@@ -369,7 +369,13 @@ export function ContactDetail({
               <Heart size={17} className="muted" />
             </div>
             <div className="inline-form">
-              <p style={{ fontSize: 13, lineHeight: 1.95, color: '#64748b' }}>
+              <p
+                style={{
+                  fontSize: 13,
+                  lineHeight: 1.95,
+                  color: 'var(--muted)',
+                }}
+              >
                 {suggested.content}
               </p>
               <div className="form-actions">

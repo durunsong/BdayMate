@@ -1,5 +1,6 @@
 'use client';
 import Link from 'next/link';
+import Image from 'next/image';
 import { useState, type FormEvent } from 'react';
 import {
   AlertCircle,
@@ -24,6 +25,8 @@ import {
   Textarea,
 } from '@/components/ui';
 import type { ContactDTO, Workspace } from '@/lib/types';
+import { greetingPresets } from '@/lib/greeting-presets';
+import './greeting-editor.css';
 import { useAction } from '@/features/use-action';
 import { parseReminderDays } from '@/features/validation';
 import {
@@ -256,8 +259,7 @@ export function ContactGreetingForm({
     contact.greetingSetting?.enabled ?? false,
   );
   const [message, setMessage] = useState(
-    contact.greetingSetting?.message ??
-      '生日快乐！愿你新的一岁平安喜乐，所愿皆成。',
+    contact.greetingSetting?.message ?? greetingPresets[0].message,
   );
   const [error, setError] = useState('');
   const [saved, setSaved] = useState(false);
@@ -265,7 +267,7 @@ export function ContactGreetingForm({
   const unavailable = !contact.email || !!contact.archivedAt;
   return (
     <form
-      className="inline-form"
+      className="inline-form greeting-editor"
       aria-label="自动生日祝福"
       onChange={() => {
         setSaved(false);
@@ -356,23 +358,95 @@ export function ContactGreetingForm({
             defaultValue={contact.greetingSetting?.sendTime ?? '09:00'}
           />
         </Field>
-        <Field
-          id="greeting-message"
-          label="生日祝福内容"
-          hint="1–3000 字，会直接发送给联系人"
+        <fieldset
+          className="greeting-presets"
+          disabled={pending || unavailable}
         >
+          <legend>从一句灵感开始</legend>
+          <p className="field-hint">
+            选择会替换当前草稿，你还可以改成自己的话。
+          </p>
+          <div className="greeting-preset-options">
+            {greetingPresets.map((preset) => (
+              <Button
+                key={preset.id}
+                type="button"
+                size="sm"
+                variant="secondary"
+                aria-label={`使用${preset.label}模板`}
+                aria-pressed={message === preset.message}
+                onClick={() => {
+                  setMessage(preset.message);
+                  setSaved(false);
+                  setError('');
+                }}
+              >
+                {preset.label}
+              </Button>
+            ))}
+          </div>
+        </fieldset>
+        <Field id="greeting-message" label="生日祝福内容">
           <Textarea
             id="greeting-message"
             name="message"
             required
             maxLength={3000}
-            rows={5}
+            rows={7}
             disabled={pending || unavailable}
             value={message}
             aria-invalid={!!error}
+            aria-describedby="greeting-message-help greeting-message-count"
             onChange={(event) => setMessage(event.target.value)}
           />
+          <div className="greeting-writing-hints">
+            <p id="greeting-message-help" className="field-hint">
+              1–3000 字，换行会保留
+            </p>
+            <span id="greeting-message-count" className="field-hint">
+              {message.length} / 3000
+            </span>
+          </div>
         </Field>
+        <section className="greeting-preview" aria-label="生日邮件预览">
+          <div className="greeting-preview-label">
+            <h3>
+              <Mail size={14} />
+              邮件预览
+            </h3>
+            <span>仅供预览</span>
+          </div>
+          <div className="greeting-letter">
+            <div className="greeting-letter-brand">
+              <Image
+                src="/brand/bdaymate-logo.png"
+                width={30}
+                height={30}
+                alt=""
+              />
+              <span>BdayMate · 生日搭子</span>
+            </div>
+            <h3>{contact.name}，生日快乐！</h3>
+            <div className="greeting-letter-body">
+              {message.trim() || (
+                <span className="muted">
+                  写下祝福，这里会同步呈现你的心意。
+                </span>
+              )}
+            </div>
+            <p className="greeting-letter-signature">
+              来自：{workspace.user.name}
+            </p>
+            <p className="greeting-letter-footer">
+              这封生日祝福由发送者通过 BdayMate
+              安排。如不希望继续收到，请联系发送者关闭自动祝福。
+            </p>
+            <p className="greeting-letter-motto">Never Miss a Special Day.</p>
+          </div>
+          <p className="field-hint greeting-preview-note">
+            预览会随文字更新；实际排版可能因邮箱而异。
+          </p>
+        </section>
         <p className="field-hint">
           每年按{contact.birthdayType === 'LUNAR' ? '农历' : '公历'}
           生日与上方庆祝规则，在生日当天重复发送。关闭此开关、移除邮箱或归档联系人会停止发送。

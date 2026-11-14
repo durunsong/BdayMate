@@ -1,5 +1,8 @@
 import type { Metadata, Viewport } from 'next';
-import { Toaster } from 'sonner';
+import { ThemeProvider } from '@/components/theme-provider';
+import { themeBootstrap } from '@/lib/theme';
+import { Suspense } from 'react';
+import { NavigationProgress } from '@/components/navigation-progress';
 import './globals.css';
 export const metadata: Metadata = {
   metadataBase: new URL(
@@ -25,15 +28,20 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="zh-CN">
-      <body>
-        {children}
-        <Toaster
-          richColors
-          position="top-center"
-          closeButton
-          toastOptions={{ className: 'bday-toast' }}
+    <html lang="zh-CN" suppressHydrationWarning>
+      <head>
+        <script
+          id="theme-init"
+          dangerouslySetInnerHTML={{ __html: themeBootstrap }}
         />
+      </head>
+      <body>
+        <ThemeProvider>
+          <Suspense fallback={null}>
+            <NavigationProgress />
+          </Suspense>
+          {children}
+        </ThemeProvider>
       </body>
     </html>
   );

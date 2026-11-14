@@ -273,32 +273,34 @@ export function Dashboard({ workspace }: { workspace: Workspace }) {
                     data={monthly}
                     margin={{ top: 5, right: 2, left: -28, bottom: 0 }}
                   >
-                    <CartesianGrid vertical={false} stroke="#f0f1f6" />
+                    <CartesianGrid vertical={false} stroke="var(--border)" />
                     <XAxis
                       dataKey="name"
-                      tick={{ fontSize: 9, fill: '#64748b' }}
+                      tick={{ fontSize: 9, fill: 'var(--muted)' }}
                       axisLine={false}
                       tickLine={false}
                       interval={0}
                     />
                     <YAxis
                       allowDecimals={false}
-                      tick={{ fontSize: 10, fill: '#64748b' }}
+                      tick={{ fontSize: 10, fill: 'var(--muted)' }}
                       axisLine={false}
                       tickLine={false}
                     />
                     <Tooltip
-                      cursor={{ fill: '#f5f5fd' }}
+                      cursor={{ fill: 'var(--primary-soft)' }}
                       contentStyle={{
                         borderRadius: 10,
-                        border: '1px solid #e7e9f0',
+                        border: '1px solid var(--border)',
+                        backgroundColor: 'var(--surface)',
+                        color: 'var(--foreground)',
                         fontSize: 12,
                       }}
                       formatter={(value) => [`${value} 位`, '生日人数']}
                     />
                     <Bar
                       dataKey="birthdays"
-                      fill="#a49ce7"
+                      fill="var(--primary)"
                       radius={[4, 4, 0, 0]}
                       maxBarSize={17}
                     />

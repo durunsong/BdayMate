@@ -1,0 +1,144 @@
+.greeting-editor .greeting-presets {
+  min-width: 0;
+  margin: 6px 0 0;
+  padding: 0;
+  border: 0;
+}
+
+.greeting-editor .greeting-presets legend {
+  margin-bottom: 5px;
+  color: var(--foreground);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.greeting-editor .greeting-preset-options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+  margin-top: 10px;
+}
+
+.greeting-editor .greeting-preset-options .button {
+  flex: 1 0 auto;
+  min-height: 38px;
+  padding-inline: 10px;
+  font-size: 12px;
+}
+
+.greeting-editor .greeting-preset-options .button[aria-pressed='true'] {
+  color: var(--primary-dark);
+  border-color: var(--primary);
+  background: var(--primary-soft);
+}
+
+.greeting-editor .textarea {
+  min-height: 180px;
+  line-height: 1.85;
+  resize: vertical;
+}
+
+.greeting-editor .greeting-writing-hints {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 4px 12px;
+}
+
+.greeting-editor .greeting-writing-hints span {
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.greeting-editor .greeting-preview {
+  min-width: 0;
+  margin: 8px 0;
+}
+
+.greeting-editor .greeting-preview-label {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+
+.greeting-editor .greeting-preview-label h3 {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.greeting-editor .greeting-preview-label > span {
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.greeting-editor .greeting-letter {
+  padding: 20px 18px 18px;
+  border: 1px solid var(--border);
+  border-top: 3px solid var(--primary);
+  background: color-mix(in srgb, var(--warm) 4%, var(--surface));
+  color: var(--foreground);
+  overflow-wrap: anywhere;
+}
+
+.greeting-editor .greeting-letter-brand {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 24px;
+  color: var(--primary-dark);
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.greeting-editor .greeting-letter-brand img {
+  flex: 0 0 auto;
+}
+
+.greeting-editor .greeting-letter > h3 {
+  margin-bottom: 18px;
+  font-size: 19px;
+  font-weight: 700;
+  line-height: 1.5;
+  letter-spacing: -0.02em;
+  text-wrap: balance;
+}
+
+.greeting-editor .greeting-letter-body {
+  min-height: 48px;
+  white-space: pre-wrap;
+  font-size: 13px;
+  line-height: 1.95;
+}
+
+.greeting-editor .greeting-letter-signature {
+  margin-top: 23px;
+  color: var(--primary-dark);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.greeting-editor .greeting-letter-footer {
+  margin-top: 24px;
+  padding-top: 15px;
+  border-top: 1px solid var(--border);
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.7;
+}
+
+.greeting-editor .greeting-letter-motto {
+  margin-top: 14px;
+  color: var(--muted);
+  font-size: 10px;
+  letter-spacing: 0.02em;
+}
+
+.greeting-editor .greeting-preview-note {
+  margin-top: 8px;
+}

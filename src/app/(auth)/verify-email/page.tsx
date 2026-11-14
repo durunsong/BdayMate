@@ -6,7 +6,7 @@ export default async function VerifyEmailPage({
   searchParams: Promise<{ email?: string; verified?: string; error?: string }>;
 }) {
   const params = await searchParams;
-  const verifiedUser = params.verified === '1' ? await currentUser() : null;
+  const verifiedUser = await currentUser();
   return (
     <AuthForm
       mode="verify"

@@ -116,9 +116,11 @@ export function sendVerificationEmail(
     template: 'VERIFICATION',
     subject: '验证你的 BdayMate 邮箱',
     heading: '让每一份心意，准时抵达',
-    body: `你好，${user.name}。请点击下方链接验证邮箱，开启你的生日搭子。若不是你发起的请求，请忽略此邮件。`,
+    body: `你好，${user.name}。\n\n欢迎来到生日搭子。重要的日子，值得被温柔记住。\n请点击下方「验证邮箱」，确认这份生日空间属于你。`,
     url,
     buttonLabel: '验证邮箱',
+    footer:
+      '这是一封账户验证邮件。如果你没有注册 BdayMate，请忽略，不需要进行任何操作。',
   });
 }
 export function sendPasswordResetEmail(
@@ -131,9 +133,11 @@ export function sendPasswordResetEmail(
     template: 'PASSWORD_RESET',
     subject: '重置你的 BdayMate 密码',
     heading: '重新设置密码',
-    body: '我们收到了一次密码重置请求。链接将在一小时后失效。如非本人操作，请忽略这封邮件。',
+    body: `你好，${user.name}。\n\n我们收到了一次密码重置请求。点击下方按钮，为你的生日空间设置一个新密码。链接将在一小时后失效。`,
     url,
     buttonLabel: '重置密码',
+    footer:
+      '如果你没有申请重置密码，请忽略这封邮件；你的密码不会因此改变。不要将此链接分享给他人。',
   });
 }
 export function sendBirthdayReminderEmail(
@@ -168,6 +172,7 @@ export function sendBirthdayReminderEmail(
         ...(data.notes ? [{ label: '备注', value: data.notes }] : []),
       ],
       url: `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/contacts/${encodeURIComponent(data.contactId)}`,
+      buttonLabel: '看看生日安排',
     },
     options,
   );
@@ -230,6 +235,8 @@ export async function sendTestEmail(user: { id: string; email: string }) {
         heading: '邮件服务已连接',
         body: '这是你在 BdayMate 发起的测试邮件。收到这封邮件说明当前 SMTP 服务已接受发送。',
         url: process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000',
+        buttonLabel: '回到生日搭子',
+        footer: '这是一封由你主动发送的测试邮件，用于检查邮件连接。无需回复。',
       },
       { log: false },
     );
