@@ -1,0 +1,39 @@
+name: BdayMate reminders
+
+on:
+  schedule:
+    - cron: '2-59/5 * * * *'
+  workflow_dispatch:
+    inputs:
+      user_id:
+        description: 'Optional exact account ID for isolated acceptance; empty processes all users'
+        required: false
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: bdaymate-reminders
+  cancel-in-progress: false
+
+jobs:
+  reminders:
+    # Leave the URL unset until the production site and SMTP are ready.
+    if: ${{ vars.BDAYMATE_APP_URL != '' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: '22'
+      - name: Generate and deliver reminders
+        env:
+          BDAYMATE_APP_URL: ${{ vars.BDAYMATE_APP_URL }}
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+          VERCEL_AUTOMATION_BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
+          BDAYMATE_CRON_USER_ID: ${{ inputs.user_id }}
+        run: node scripts/scheduled-cron.mjs

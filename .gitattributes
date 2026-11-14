@@ -1,0 +1,2 @@
+# Applied migrations are immutable; preserve their original trailing blank lines.
+prisma/migrations/**/migration.sql whitespace=-blank-at-eof

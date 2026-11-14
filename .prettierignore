@@ -1,0 +1,10 @@
+node_modules
+.next
+src/generated
+pnpm-lock.yaml
+coverage
+playwright-report
+test-results
+.env*
+LICENSE
+next-env.d.ts

@@ -1,0 +1,317 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum BirthdayType {
+  SOLAR
+  LUNAR
+}
+
+enum Relationship {
+  FAMILY
+  FRIEND
+  CLASSMATE
+  COLLEAGUE
+  MANAGER
+  CLIENT
+  PARTNER
+  OTHER
+}
+
+enum EmailStatus {
+  PENDING
+  PROCESSING
+  SENT
+  FAILED
+}
+
+enum GiftStatus {
+  IDEA
+  PLANNED
+  PURCHASED
+  GIVEN
+}
+
+model User {
+  wishRecords        WishRecord[]
+  id                 String              @id @default(cuid())
+  name               String
+  email              String              @unique
+  emailVerified      Boolean             @default(false)
+  image              String?
+  createdAt          DateTime            @default(now())
+  updatedAt          DateTime            @updatedAt
+  sessions           Session[]
+  accounts           Account[]
+  profile            Profile?
+  reminderPreference ReminderPreference?
+  contacts           Contact[]
+  tags               Tag[]
+  emailQueue         EmailQueue[]
+  emailLogs          EmailLog[]
+  notifications      Notification[]
+  wishes             WishTemplate[]
+  gifts              GiftRecord[]
+
+  @@map("bday_user")
+}
+
+model Session {
+  id        String   @id @default(cuid())
+  expiresAt DateTime
+  token     String   @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  ipAddress String?
+  userAgent String?
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("bday_session")
+}
+
+model Account {
+  id                    String    @id @default(cuid())
+  accountId             String
+  providerId            String
+  userId                String
+  user                  User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  accessToken           String?
+  refreshToken          String?
+  idToken               String?
+  accessTokenExpiresAt  DateTime?
+  refreshTokenExpiresAt DateTime?
+  scope                 String?
+  password              String?
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  @@unique([providerId, accountId])
+  @@index([userId])
+  @@map("bday_account")
+}
+
+model Verification {
+  id         String   @id @default(cuid())
+  identifier String
+  value      String
+  expiresAt  DateTime
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@index([identifier])
+  @@map("bday_verification")
+}
+
+model Profile {
+  id        String   @id @default(cuid())
+  userId    String   @unique
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  timeZone  String   @default("Asia/Shanghai")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("bday_profile")
+}
+
+model Contact {
+  wishRecords     WishRecord[]
+  id              String                  @id @default(cuid())
+  userId          String
+  user            User                    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name            String
+  avatar          String?
+  gender          String?
+  birthdayType    BirthdayType            @default(SOLAR)
+  birthYear       Int?
+  solarMonth      Int?
+  solarDay        Int?
+  lunarMonth      Int?
+  lunarDay        Int?
+  isLeapMonth     Boolean                 @default(false)
+  leapDayPolicy   String                  @default("FEB28")
+  lunarLeapPolicy String                  @default("REGULAR")
+  relationship    Relationship            @default(FRIEND)
+  email           String?
+  phone           String?
+  notes           String?
+  createdAt       DateTime                @default(now())
+  updatedAt       DateTime                @updatedAt
+  archivedAt      DateTime?
+  tags            ContactTag[]
+  reminderSetting ContactReminderSetting?
+  gifts           GiftRecord[]
+  emailQueue      EmailQueue[]
+
+  @@unique([id, userId])
+  @@index([userId, archivedAt])
+  @@index([userId, name])
+  @@index([userId, relationship])
+  @@map("bday_contact")
+}
+
+model Tag {
+  id          String       @id @default(cuid())
+  userId      String
+  user        User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name        String
+  color       String       @default("#6366F1")
+  description String?
+  contacts    ContactTag[]
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+
+  @@unique([id, userId])
+  @@unique([userId, name])
+  @@map("bday_tag")
+}
+
+model ContactTag {
+  userId    String
+  contactId String
+  tagId     String
+  contact   Contact @relation(fields: [contactId, userId], references: [id, userId], onDelete: Cascade)
+  tag       Tag     @relation(fields: [tagId, userId], references: [id, userId], onDelete: Cascade)
+
+  @@id([contactId, tagId])
+  @@index([tagId, userId])
+  @@map("bday_contact_tag")
+}
+
+model ReminderPreference {
+  id           String   @id @default(cuid())
+  userId       String   @unique
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  emailEnabled Boolean  @default(true)
+  daysBefore   Int[]    @default([7, 3, 1, 0])
+  sendTime     String   @default("09:00")
+  updatedAt    DateTime @updatedAt
+
+  @@map("bday_reminder_preference")
+}
+
+model ContactReminderSetting {
+  id         String  @id @default(cuid())
+  contactId  String  @unique
+  userId     String
+  contact    Contact @relation(fields: [contactId, userId], references: [id, userId], onDelete: Cascade)
+  enabled    Boolean @default(true)
+  daysBefore Int[]   @default([7, 3, 1, 0])
+  sendTime   String  @default("09:00")
+
+  @@unique([contactId, userId])
+  @@map("bday_contact_reminder")
+}
+
+model EmailQueue {
+  id           String      @id @default(cuid())
+  userId       String
+  user         User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  contactId    String?
+  contact      Contact?    @relation(fields: [contactId, userId], references: [id, userId], onDelete: Cascade)
+  recipient    String
+  template     String
+  subject      String
+  payload      Json
+  scheduledAt  DateTime
+  status       EmailStatus @default(PENDING)
+  attemptCount Int         @default(0)
+  lastError    String?
+  dedupeKey    String      @unique
+  sentAt       DateTime?
+  lockedAt     DateTime?
+  lockToken    String?
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
+  logs         EmailLog[]
+
+  @@index([status, scheduledAt])
+  @@index([userId, contactId])
+  @@map("bday_email_queue")
+}
+
+model EmailLog {
+  id        String      @id @default(cuid())
+  userId    String
+  user      User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  queueId   String?
+  queue     EmailQueue? @relation(fields: [queueId], references: [id], onDelete: SetNull)
+  recipient String
+  subject   String
+  template  String
+  status    EmailStatus
+  error     String?
+  messageId String?
+  sentAt    DateTime?
+  createdAt DateTime    @default(now())
+
+  @@index([userId, createdAt])
+  @@map("bday_email_log")
+}
+
+model Notification {
+  id        String    @id @default(cuid())
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title     String
+  body      String
+  href      String?
+  readAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([userId, readAt, createdAt])
+  @@map("bday_notification")
+}
+
+model WishTemplate {
+  id           String       @id @default(cuid())
+  userId       String
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title        String
+  content      String
+  relationship Relationship @default(OTHER)
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+
+  @@index([userId, relationship])
+  @@map("bday_wish")
+}
+
+model GiftRecord {
+  id          String     @id @default(cuid())
+  userId      String
+  user        User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  contactId   String
+  contact     Contact    @relation(fields: [contactId, userId], references: [id, userId], onDelete: Cascade)
+  name        String
+  description String?
+  budget      Decimal?   @db.Decimal(12, 2)
+  currency    String     @default("CNY")
+  purchaseUrl String?
+  givenAt     DateTime?  @db.Date
+  status      GiftStatus @default(IDEA)
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+
+  @@index([userId, contactId])
+  @@map("bday_gift")
+}
+
+model WishRecord {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  contactId String
+  contact   Contact  @relation(fields: [contactId, userId], references: [id, userId], onDelete: Cascade)
+  content   String
+  sentAt    DateTime @default(now())
+
+  @@index([userId, contactId, sentAt])
+  @@map("bday_wish_record")
+}
