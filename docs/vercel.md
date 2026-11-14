@@ -79,7 +79,9 @@ pnpm db:status
 4. 用验收账号添加当天生日并设置到期提醒，关闭浏览器等待调度；检查实际收件箱与页面邮件记录。
 5. 在 GitHub Actions 检查连续调度、队列积压和 FAILED 原因。DELIVERY_UNCERTAIN 必须核对供应商记录，不能盲目重发。
 
-Vercel 不运行本仓库的 Docker 常驻 Worker。它仅适用于另行部署的容器主机。本地回归覆盖真实 Neon、本地 SMTP 和 GET/POST 浏览器链路，不代表已经登录 Vercel、填写远程环境变量或完成公网部署。
+Vercel 不运行本仓库的 Docker 常驻 Worker。它仅适用于另行部署的容器主机。本地回归与远程发布分别验收，不以本地通过代替远程结果。
+
+2026-11-14 远程验收：生产站点 https://bdaymate.vercel.app 已部署 Ready，现有 Cron Secret 和生产 URL 已经用户授权配置到 GitHub，工作流 active。手动隔离运行 [43587013521](https://github.com/durunsong/BdayMate/actions/runs/43587013521) 成功调用两项生产接口；周期 schedule 的实际触发证据与限制记录在 [progress.md](progress.md)。生产生日祝福表单已验证保存、刷新持久化、UTC 入队和隔离数据清理；本轮未向真实联系人发送额外邮件。
 
 ## 官方依据（2026-11-14 核对）
 

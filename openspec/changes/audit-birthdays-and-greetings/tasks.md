@@ -7,5 +7,5 @@
 - [x] Add user controls and browser tests for both delivery modes.
 - [x] Verify advance reminders, year rollover, cancellation, concurrency and SMTP failures.
 - [x] Run full tests, lint, typecheck, build, formatting, encoding and credential diff checks.
-- [ ] Commit/push intended changes and verify production deployment.
-- [ ] Configure authorized Actions secrets/URL, isolated acceptance and automatic schedule; report limitations.
+- [x] Commit/push intended changes and verify production deployment.
+- [x] Configure authorized Actions secrets/URL, isolated acceptance and automatic schedule; report limitations (active schedule and successful manual acceptance; first schedule event not yet observed).

@@ -95,4 +95,12 @@
 - 新增过期提前日取消，避免停机后积压提醒集中补发。独立代码复核发现批量发送跨午夜会沿用旧时间，已用真实 DB + 本地 SMTP 复现红灯并修复：每次任务、拿锁读完用户后刷新时钟；回归验证一封发送、下一封过期取消。
 - 最终 pnpm test：14 个文件、177 项全部通过；PLAYWRIGHT_CHANNEL=chrome pnpm test:e2e：6 项通过，涵盖认证、提醒真实本地投递、祝福独立设置、缺邮箱、归档、桌面/手机和品牌图标。
 - pnpm lint、pnpm typecheck、pnpm format:check、Vercel production 参数下 pnpm build、git diff --check 均通过。修改文件 UTF-8/无 BOM/无异常替换字符，未发现私人绝对路径或秘密值。回归只用本地捕获 SMTP、隔离测试记录按精确 ID 清理。
-- 用户明确授权 GitHub Actions 保存现有 Cron Secret 并启用五分钟调度。Secret 已保存，生产 URL 激活与线上运行证据在本次发布验收后补充；不把配置文件存在视为已自动运行。
+- 用户明确授权 GitHub Actions 保存现有 Cron Secret 并启用五分钟调度。已配置仓库 Secret 与 BDAYMATE_APP_URL=https://bdaymate.vercel.app；仓库默认分支 main、Actions 权限开启、工作流 active 均经 API 回读确认。
+
+### 生产发布与隔离验收
+
+- 功能提交 d5ef4bf29d23c499817d1dfd14e87d8185a040c7 已正常推送 main 与 feat/full-birthday-platform。Vercel Production 部署 2i6oAV2ev5fjDXA9aR875SbJeoWR 显示 Ready，稳定站点为 https://bdaymate.vercel.app。
+- 在真实生产页面使用隔离、已验证的临时账号：联系人生日为 2026-11-16，自我提醒关闭；祝福默认关闭，开启并设置 08:35、验收正文后保存成功，刷新仍保持配置。Neon 中仅生成一条 BIRTHDAY_GREETING，UTC 计划时间 2026-11-16T00:35:00.000Z，与 Asia/Shanghai 08:35 一致；无自我提醒、无发信日志。
+- 验收完按精确用户 ID 清理：用户、联系人、祝福设置、队列、邮件日志剩余均为 0；临时本地凭据已删除，生产页面重新载入后返回登录。未向真实联系人发送验收邮件。
+- GitHub 手动验收运行 [43587013521](https://github.com/durunsong/BdayMate/actions/runs/43587013521) 于 2026-11-14 10:48 UTC 完成 success，Generate and deliver reminders 步骤成功。使用不存在的精确验收 user_id，验证真实 GitHub Runner → Vercel 鉴权 → 生成/消费接口，无测试发信。
+- 五分钟 schedule 已启用。手动验收与真实周期触发分开记录；截至此次检查尚未观察到 schedule 事件，不据此承诺整分钟送达。GitHub 的延迟、公开仓库停用条件与低流量处理上限见 vercel.md。
