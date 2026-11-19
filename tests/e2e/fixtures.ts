@@ -56,6 +56,9 @@ export const test = base.extend<{ account: OwnedAccount }>({
           });
         await db.user.deleteMany({ where: { id: account.id, email } });
       }
+      await db.verification.deleteMany({
+        where: { identifier: 'sign-in-otp-' + email },
+      });
       await db.$disconnect();
     }
   },

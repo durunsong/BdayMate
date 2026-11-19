@@ -29,7 +29,7 @@ pnpm dev
 
 ## 功能入口
 
-- `/register`、`/login`、`/verify-email`、`/forgot-password`、`/reset-password`：Better Auth 注册、验证、登录和找回密码。
+- `/register`、`/login`、`/verify-email`、`/forgot-password`、`/reset-password`：Better Auth 注册、验证、密码 / 邮箱验证码登录和找回密码。验证码登录仅限已注册账户，6 位数字、5 分钟内有效；首次通过验证码验证邮箱后，可在设置 → 账户安全通过邮件设置密码。
 - `/dashboard`：联系人总数、今日/本月/7天/30天生日、最近添加与月分布。
 - `/contacts`：搜索、关系/标签/月筛选、排序、批量归档/恢复/删除、CSV 导入导出；详情提供独立提醒、礼物及祝福历史。
 - `/calendar`：月、周、列表视图，支持年份/月切换及关系/标签筛选。

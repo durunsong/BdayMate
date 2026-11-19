@@ -3,6 +3,7 @@ import { betterAuth } from 'better-auth';
 import { APIError, createAuthMiddleware } from 'better-auth/api';
 import { prismaAdapter } from 'better-auth/adapters/prisma';
 import { nextCookies } from 'better-auth/next-js';
+import { emailOTP } from 'better-auth/plugins';
 import { db } from './db';
 import {
   sendVerificationEmail,
@@ -15,6 +16,39 @@ export const auth = betterAuth({
   secret: process.env.BETTER_AUTH_SECRET,
   hooks: {
     before: createAuthMiddleware(async (ctx) => {
+      // Only login uses OTP; keep verification and password reset on their existing flows.
+      if (
+        (ctx.path.startsWith('/email-otp/') &&
+          (ctx.path !== '/email-otp/send-verification-otp' ||
+            ctx.body?.type !== 'sign-in')) ||
+        ctx.path === '/forget-password/email-otp'
+      ) {
+        throw new APIError('BAD_REQUEST', {
+          code: 'OTP_LOGIN_ONLY',
+          message: '邮箱验证码仅用于登录',
+        });
+      }
+      if (ctx.path === '/email-otp/send-verification-otp') {
+        // This plugin normally swallows delivery errors; the login form needs a truthful result.
+        return {
+          context: {
+            context: {
+              runInBackgroundOrAwait: async (
+                promise: void | Promise<unknown>,
+              ) => {
+                try {
+                  await promise;
+                } catch {
+                  throw new APIError('SERVICE_UNAVAILABLE', {
+                    code: 'OTP_DELIVERY_FAILED',
+                    message: '验证码发送失败，请稍后重试',
+                  });
+                }
+              },
+            },
+          },
+        };
+      }
       if (ctx.path !== '/delete-user') return;
       // A fresh session is insufficient for this destructive action. Better Auth
       // still verifies the supplied password against the credential account.
@@ -76,11 +110,40 @@ export const auth = betterAuth({
     max: 60,
     customRules: {
       '/sign-in/email': { window: 60, max: 10 },
+      '/sign-in/email-otp': { window: 60, max: 10 },
       '/sign-up/email': { window: 60, max: 5 },
       '/request-password-reset': { window: 60, max: 3 },
     },
   },
-  plugins: [nextCookies()],
+  plugins: [
+    emailOTP({
+      disableSignUp: true,
+      otpLength: 6,
+      expiresIn: 300,
+      allowedAttempts: 3,
+      storeOTP: 'hashed',
+      resendStrategy: 'rotate',
+      rateLimit: { window: 60, max: 3 },
+      async sendVerificationOTP({ email, otp, type }) {
+        if (type !== 'sign-in') return;
+        const user = await db.user.findUnique({
+          where: { email },
+          select: { id: true },
+        });
+        if (!user) return;
+        await sendEmail({
+          userId: user.id,
+          recipient: email,
+          template: 'LOGIN_OTP',
+          subject: '你的 BdayMate 登录验证码',
+          heading: '登录你的生日空间',
+          body: `登录验证码：${otp}\n\n验证码在 5 分钟内有效，仅可使用一次。请在登录页输入，不要分享给他人。`,
+          footer: '如果你没有申请登录，请忽略这封邮件。',
+        });
+      },
+    }),
+    nextCookies(),
+  ],
   logger: {
     level: 'error',
     log: () => {

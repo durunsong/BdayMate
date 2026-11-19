@@ -1,3 +1,10 @@
+.auth-login-methods {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-bottom: 24px;
+}
+
 .auth-theme-control {
   position: absolute;
   z-index: 2;

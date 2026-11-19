@@ -253,6 +253,27 @@ export function SettingsPageContent({ workspace }: { workspace: Workspace }) {
                         <div>
                           <h3>登录密码</h3>
                           <p>修改密码后，会退出其他设备的登录。</p>
+                          <p>
+                            首次通过验证码确认邮箱后，原密码会失效，请通过邮件重新设置。
+                          </p>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            loading={authPending}
+                            onClick={() =>
+                              void authTask(
+                                () =>
+                                  authClient.requestPasswordReset({
+                                    email: workspace.user.email,
+                                    redirectTo: `${window.location.origin}/reset-password`,
+                                  }),
+                                '密码设置邮件已发送，请检查收件箱和垃圾邮件。',
+                                false,
+                              )
+                            }
+                          >
+                            通过邮件设置密码
+                          </Button>
                         </div>
                       </div>
                       <Button

@@ -55,7 +55,9 @@ const labels = {
 export function authErrorMessage(error: {
   message?: string;
   code?: string;
+  status?: number;
 }): string {
+  if (error.status === 429) return '操作太频繁，请稍等一分钟后重试。';
   const errors: Record<string, string> = {
     INVALID_EMAIL_OR_PASSWORD: '邮箱或密码不正确，请检查后重试。',
     EMAIL_NOT_VERIFIED: '请先验证邮箱，我们已重新发送验证邮件。',
@@ -68,6 +70,10 @@ export function authErrorMessage(error: {
     TOKEN_EXPIRED: '链接已过期，请重新申请。',
     TOO_MANY_REQUESTS: '操作太频繁，请稍等一分钟后重试。',
     SESSION_EXPIRED: '登录已过期，请重新登录。',
+    INVALID_OTP: '验证码不正确或已失效，请重试或重新发送。',
+    OTP_EXPIRED: '验证码已过期，请重新发送。',
+    TOO_MANY_ATTEMPTS: '验证码尝试次数已用完，请重新发送。',
+    OTP_DELIVERY_FAILED: '验证码发送失败，请稍后重试。',
   };
   return error.code && errors[error.code]
     ? errors[error.code]
@@ -136,6 +142,11 @@ export function AuthForm({
   verified?: boolean;
   errorCode?: string;
 }) {
+  const [loginMethod, setLoginMethod] = useState<'password' | 'otp'>(
+    'password',
+  );
+  const otpLogin = mode === 'login' && loginMethod === 'otp';
+  const [sendingCode, setSendingCode] = useState(false);
   const [pending, setPending] = useState(false);
   const submitting = useRef(false);
   const [checking, setChecking] = useState(false);
@@ -195,9 +206,15 @@ export function AuthForm({
       password:
         mode === 'register' || mode === 'reset'
           ? z.string().min(10, '密码至少 10 位').max(128, '密码不能超过 128 位')
-          : mode === 'login'
+          : mode === 'login' && !otpLogin
             ? z.string().min(1, '请输入密码')
             : z.string(),
+      otp: otpLogin
+        ? z
+            .string()
+            .trim()
+            .regex(/^\d{6}$/, '请输入 6 位数字验证码')
+        : z.string(),
       confirmPassword: z.string(),
       rememberMe: z.boolean(),
     })
@@ -216,6 +233,10 @@ export function AuthForm({
   const {
     register,
     handleSubmit,
+    trigger,
+    getValues,
+    setValue,
+    clearErrors,
     formState: { errors },
   } = useForm<Values>({
     resolver: zodResolver(schema),
@@ -223,10 +244,41 @@ export function AuthForm({
       name: '',
       email,
       password: '',
+      otp: '',
       confirmPassword: '',
       rememberMe: true,
     },
   });
+  async function sendLoginCode() {
+    if (submitting.current || cooldown > 0) return;
+    submitting.current = true;
+    setPending(true);
+    setSendingCode(true);
+    setMessage('');
+    setSent(false);
+    try {
+      if (!(await trigger('email'))) return;
+      const result = await authClient.emailOtp.sendVerificationOtp({
+        email: getValues('email'),
+        type: 'sign-in',
+      });
+      if (result.error) {
+        setMessage(authErrorMessage(result.error));
+        if (result.error.status === 429) setCooldown(60);
+        return;
+      }
+      setValue('otp', '');
+      clearErrors('otp');
+      setSent(true);
+      setCooldown(60);
+    } catch {
+      setMessage('网络连接失败，请稍后重试。');
+    } finally {
+      submitting.current = false;
+      setPending(false);
+      setSendingCode(false);
+    }
+  }
   async function submit(data: Values) {
     if (submitting.current || (mode === 'verify' && cooldown > 0)) return;
     submitting.current = true;
@@ -234,11 +286,16 @@ export function AuthForm({
     setMessage('');
     try {
       if (mode === 'login') {
-        const result = await authClient.signIn.email({
-          email: data.email,
-          password: data.password,
-          rememberMe: data.rememberMe,
-        });
+        const result = otpLogin
+          ? await authClient.signIn.emailOtp({
+              email: data.email,
+              otp: data.otp,
+            })
+          : await authClient.signIn.email({
+              email: data.email,
+              password: data.password,
+              rememberMe: data.rememberMe,
+            });
         if (result.error) {
           setMessage(authErrorMessage(result.error));
           if (result.error.code === 'EMAIL_NOT_VERIFIED')
@@ -343,6 +400,28 @@ export function AuthForm({
       )}
       <h1>{text.title}</h1>
       <p className="auth-subtitle">{text.description}</p>
+      {mode === 'login' && (
+        <div className="auth-login-methods" role="group" aria-label="登录方式">
+          {(['password', 'otp'] as const).map((method) => (
+            <Button
+              key={method}
+              type="button"
+              variant={loginMethod === method ? 'secondary' : 'ghost'}
+              aria-pressed={loginMethod === method}
+              disabled={pending}
+              onClick={() => {
+                setLoginMethod(method);
+                clearErrors();
+                setValue('otp', '');
+                setMessage('');
+                setSent(false);
+              }}
+            >
+              {method === 'password' ? '密码登录' : '邮箱验证码登录'}
+            </Button>
+          ))}
+        </div>
+      )}
       {mode === 'verify' && (
         <div className="auth-verification-guide">
           {email && (
@@ -397,9 +476,11 @@ export function AuthForm({
       <FormMessage message={message} />
       {sent && (
         <div className="validation-success" role="status">
-          {mode === 'forgot'
-            ? '如果这个邮箱已注册，重置链接会发送到你的收件箱。请同时检查垃圾邮件文件夹。'
-            : '如果邮箱尚未验证，新的验证链接会发送到你的收件箱。请检查收件箱和垃圾邮件。'}
+          {otpLogin
+            ? '如果这个邮箱已注册，登录验证码会发送到你的收件箱，5 分钟内有效。请同时检查垃圾邮件。'
+            : mode === 'forgot'
+              ? '如果这个邮箱已注册，重置链接会发送到你的收件箱。请同时检查垃圾邮件文件夹。'
+              : '如果邮箱尚未验证，新的验证链接会发送到你的收件箱。请检查收件箱和垃圾邮件。'}
         </div>
       )}
       {mode === 'reset' && !token ? (
@@ -437,12 +518,50 @@ export function AuthForm({
                 type="email"
                 autoComplete="email"
                 placeholder="you@example.com"
-                {...register('email')}
+                {...register('email', {
+                  onChange: () => {
+                    if (otpLogin) {
+                      setValue('otp', '');
+                      setSent(false);
+                      setMessage('');
+                    }
+                  },
+                })}
                 disabled={pending}
               />
             </Field>
           )}
-          {['login', 'register', 'reset'].includes(mode) && (
+          {otpLogin && (
+            <>
+              <Field
+                id="auth-otp"
+                label="邮箱验证码"
+                error={errors.otp?.message}
+                hint="输入邮件中的 6 位数字验证码"
+              >
+                <Input
+                  id="auth-otp"
+                  type="text"
+                  inputMode="numeric"
+                  autoComplete="one-time-code"
+                  maxLength={6}
+                  placeholder="6 位数字验证码"
+                  {...register('otp')}
+                  disabled={pending}
+                />
+              </Field>
+              <Button
+                type="button"
+                variant="secondary"
+                loading={sendingCode}
+                disabled={pending || cooldown > 0}
+                onClick={() => void sendLoginCode()}
+              >
+                {cooldown > 0 ? `重新发送（${cooldown} 秒后）` : '发送验证码'}
+              </Button>
+            </>
+          )}
+          {['login', 'register', 'reset'].includes(mode) && !otpLogin && (
             <Field
               id="auth-password"
               label={mode === 'reset' ? '新密码' : '密码'}
@@ -494,7 +613,7 @@ export function AuthForm({
               />
             </Field>
           )}
-          {mode === 'login' && (
+          {mode === 'login' && !otpLogin && (
             <div className="row-between">
               <label className="checkbox-label" style={{ fontSize: 12 }}>
                 <input type="checkbox" {...register('rememberMe')} />
@@ -507,9 +626,9 @@ export function AuthForm({
           )}
           <Button
             type="submit"
-            loading={pending}
+            loading={pending && !sendingCode}
             variant={mode === 'verify' ? 'ghost' : 'primary'}
-            disabled={mode === 'verify' && cooldown > 0}
+            disabled={sendingCode || (mode === 'verify' && cooldown > 0)}
           >
             {mode === 'verify' && cooldown > 0
               ? `重新发送（${cooldown} 秒后）`

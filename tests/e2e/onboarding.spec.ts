@@ -58,7 +58,7 @@ test('signup explains inbox verification, resend recovers, and real mail verifie
     { times: 1 },
   );
   await resend.click();
-  await expect(page.getByRole('alert')).toBeVisible();
+  await expect(page.locator('.auth-form').getByRole('alert')).toBeVisible();
   await expect(resend).toBeEnabled();
   await resend.click();
   await expect(page.locator('.validation-success')).toContainText(

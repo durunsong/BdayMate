@@ -70,8 +70,8 @@ if (process.env.BDAY_AUTH_WORKER !== '1') {
           'Authentication integration failed:' + String.fromCharCode(10) + safe,
         );
       }
-      expect(result.output).toContain('12 passed');
-      console.info('Real authentication lifecycle: 12 checks passed.');
+      expect(result.output).toContain('20 passed');
+      console.info('Real authentication lifecycle: 20 checks passed.');
     } finally {
       await capture.close();
     }
@@ -118,9 +118,34 @@ if (process.env.BDAY_AUTH_WORKER !== '1') {
             });
           await db.user.deleteMany({ where: { id: userId, email } });
         }
+        await db.verification.deleteMany({
+          where: { identifier: 'sign-in-otp-' + email },
+        });
         await db.$disconnect();
       }
     });
+    const otpIdentifier = 'sign-in-otp-' + email;
+    const requestOTP = () =>
+      auth.api.sendVerificationOTP({
+        headers,
+        body: { email, type: 'sign-in' },
+        asResponse: true,
+      });
+    const readOTP = async () => {
+      const mails = await readMail(process.env.BDAY_CAPTURE_URL!, email);
+      const mail = mails
+        .filter((item) => item.text.includes('登录验证码'))
+        .at(-1);
+      const code = mail?.text.match(/验证码[：:]\s*(\d{6})/)?.[1];
+      expect(Boolean(code), 'SMTP delivered a six-digit login code').toBe(true);
+      return code!;
+    };
+    const loginOTP = (otp: string) =>
+      auth.api.signInEmailOTP({
+        headers,
+        body: { email, otp },
+        asResponse: true,
+      });
     const sessionHeaders = () => new Headers({ origin: baseURL, cookie });
     const saveCookie = (response: Response) => {
       cookie = response.headers
@@ -213,6 +238,167 @@ if (process.env.BDAY_AUTH_WORKER !== '1') {
       expect(Boolean(cookie)).toBe(true);
       const session = await auth.api.getSession({ headers: sessionHeaders() });
       expect(session?.user.id).toBe(userId);
+    });
+    it('delivers a login code through SMTP without storing or logging it in plaintext', async () => {
+      expect((await requestOTP()).status).toBe(200);
+      const otp = await readOTP();
+      const row = await db.verification.findFirstOrThrow({
+        where: { identifier: otpIdentifier },
+      });
+      expect(row.value.includes(otp)).toBe(false);
+      expect(row.expiresAt.getTime() - Date.now()).toBeGreaterThan(240_000);
+      expect(row.expiresAt.getTime() - Date.now()).toBeLessThanOrEqual(300_000);
+      const logs = await db.emailLog.findMany({
+        where: { userId, template: 'LOGIN_OTP' },
+      });
+      expect(logs).toHaveLength(1);
+      expect(JSON.stringify(logs).includes(otp)).toBe(false);
+    });
+    it('rejects a wrong code then creates a session once, even for concurrent correct submissions', async () => {
+      const otp = await readOTP();
+      const wrong = otp === '000000' ? '111111' : '000000';
+      const invalid = await loginOTP(wrong);
+      expect(invalid.status).toBe(400);
+      expect((await invalid.json()).code).toBe('INVALID_OTP');
+      const responses = await Promise.all([loginOTP(otp), loginOTP(otp)]);
+      expect(responses.map((response) => response.status).sort()).toEqual([
+        200, 400,
+      ]);
+      saveCookie(responses.find((response) => response.status === 200)!);
+      expect(
+        (await auth.api.getSession({ headers: sessionHeaders() }))?.user.id,
+      ).toBe(userId);
+      expect((await loginOTP(otp)).status).toBe(400);
+    });
+    it('rejects an expired code', async () => {
+      expect((await requestOTP()).status).toBe(200);
+      const otp = await readOTP();
+      await db.verification.updateMany({
+        where: { identifier: otpIdentifier },
+        data: { expiresAt: new Date(Date.now() - 1000) },
+      });
+      const result = await loginOTP(otp);
+      expect(result.status).toBe(400);
+      expect((await result.json()).code).toBe('OTP_EXPIRED');
+    });
+    it('locks out a code after three wrong guesses', async () => {
+      expect((await requestOTP()).status).toBe(200);
+      const otp = await readOTP();
+      const wrong = otp === '000000' ? '111111' : '000000';
+      for (let attempt = 0; attempt < 3; attempt++)
+        expect((await loginOTP(wrong)).status).toBe(400);
+      const result = await loginOTP(otp);
+      expect(result.status).toBe(403);
+      expect((await result.json()).code).toBe('TOO_MANY_ATTEMPTS');
+    });
+    it('rotates a previous code on resend', async () => {
+      expect((await requestOTP()).status).toBe(200);
+      const oldRow = await db.verification.findFirstOrThrow({
+        where: { identifier: otpIdentifier },
+      });
+      expect((await requestOTP()).status).toBe(200);
+      const newRow = await db.verification.findFirstOrThrow({
+        where: { identifier: otpIdentifier },
+        orderBy: { createdAt: 'desc' },
+      });
+      expect(newRow.id).not.toBe(oldRow.id);
+      expect((await loginOTP(await readOTP())).status).toBe(200);
+      expect(
+        await db.verification.count({ where: { identifier: otpIdentifier } }),
+      ).toBe(0);
+    });
+    it('does not send mail or create an account for an unknown address', async () => {
+      const unknown = 'test-unknown-' + randomUUID() + '@example.test';
+      const result = await auth.api.sendVerificationOTP({
+        headers,
+        body: { email: unknown, type: 'sign-in' },
+        asResponse: true,
+      });
+      expect(result.status).toBe(200);
+      expect(
+        await readMail(process.env.BDAY_CAPTURE_URL!, unknown),
+      ).toHaveLength(0);
+      expect(
+        (
+          await auth.api.signInEmailOTP({
+            headers,
+            body: { email: unknown, otp: '000000' },
+            asResponse: true,
+          })
+        ).status,
+      ).toBe(400);
+      expect(await db.user.count({ where: { email: unknown } })).toBe(0);
+      expect(
+        await db.verification.count({
+          where: { identifier: 'sign-in-otp-' + unknown },
+        }),
+      ).toBe(0);
+    });
+    it('limits HTTP sends and exposes no unused OTP authentication flows', async () => {
+      const requestHeaders = {
+        origin: baseURL,
+        'content-type': 'application/json',
+        'x-forwarded-for': '198.18.0.42',
+      };
+      const post = (path: string, body: object) =>
+        auth.handler(
+          new Request(baseURL + '/api/auth' + path, {
+            method: 'POST',
+            headers: requestHeaders,
+            body: JSON.stringify(body),
+          }),
+        );
+      for (let attempt = 0; attempt < 3; attempt++)
+        expect(
+          (
+            await post('/email-otp/send-verification-otp', {
+              email,
+              type: 'sign-in',
+            })
+          ).status,
+        ).toBe(200);
+      expect(
+        (
+          await post('/email-otp/send-verification-otp', {
+            email,
+            type: 'sign-in',
+          })
+        ).status,
+      ).toBe(429);
+      await expect(
+        auth.api.sendVerificationOTP({
+          headers,
+          body: { email, type: 'forget-password' },
+          asResponse: true,
+        }),
+      ).rejects.toMatchObject({ status: 'BAD_REQUEST' });
+      expect(
+        (await post('/email-otp/request-password-reset', { email })).status,
+      ).toBe(400);
+    });
+    it('reports SMTP delivery failure without returning a successful send', async () => {
+      const { closeTransporter } = await import('../../src/services/email');
+      const port = process.env.SMTP_PORT;
+      closeTransporter();
+      process.env.SMTP_PORT = '1';
+      try {
+        const result = await auth.handler(
+          new Request(baseURL + '/api/auth/email-otp/send-verification-otp', {
+            method: 'POST',
+            headers: {
+              origin: baseURL,
+              'content-type': 'application/json',
+              'x-forwarded-for': '198.18.0.43',
+            },
+            body: JSON.stringify({ email, type: 'sign-in' }),
+          }),
+        );
+        expect(result.status).toBe(503);
+        expect((await result.json()).code).toBe('OTP_DELIVERY_FAILED');
+      } finally {
+        closeTransporter();
+        process.env.SMTP_PORT = port;
+      }
     });
     it('requests password reset through real SMTP and rejects a fabricated token', async () => {
       const response = await auth.api.requestPasswordReset({

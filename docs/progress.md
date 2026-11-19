@@ -117,3 +117,14 @@
 验证：`pnpm test` 19 个文件、194 项通过；`PLAYWRIGHT_CHANNEL=chrome pnpm test:e2e` 19 条全部通过。覆盖真实注册/验邮/重置/登录拦截、本地 SMTP、生日提醒与联系人祝福、文件下载、延迟导航、主题持久化/系统偏好/跨标签页、暂停动画、1440px/390px 双主题业务页面和弹窗。`pnpm lint`、`pnpm typecheck`、`pnpm format:check`、Vercel production 参数下 `pnpm build`、`git diff --check` 通过。Impeccable 机械检查无报告；最终桌面/手机截图检查并修正了关闭按钮定位。修改文件通过 UTF-8、BOM、异常替换字符、个人路径和秘密值扫描。
 
 发布验收：功能提交 `0c65ffd804c526d4fe8c68796426dbdd2df43218` 已正常推送 `main` 与 `feat/full-birthday-platform`；Vercel Production 部署 `4k5UxUgZhKyqty99L4uZ2Yd2zTsf` 显示 Ready，并绑定正式域名。线上首页、登录、注册和 favicon 返回 200；未授权导出与邮件 Cron 保持 401。实际浏览器确认圆形主题切换、跨页主题保留、顶部加载反馈及登录页完成后加载条消失。开发分支的 Preview 沿用独立环境配置，不复制生产密钥；本次正式发布不依赖 Preview。
+
+## 2026-11-19 邮箱验证码登录
+
+- 登录页增加密码 / 邮箱验证码切换，默认密码登录。支持发送状态、60 秒重发冷却、6 位数字输入、验证码过期/错误/次数耗尽/限流提示；切换方式不重置冷却，更换邮箱清空验证码及发送提示。
+- 复用 Better Auth emailOTP 和品牌邮件服务，验证码 300 秒有效、哈希存储、最多 3 次错误尝试、成功后原子消费；仅已有账户可登录，未知邮箱统一回应且不发信、不建账户。仅开放发送登录码与验证码登录用途，其他 OTP 接口被拒绝。发送失败返回 503，不能伪装发送成功。
+- 独立审查发现并修复 1 项 P2：未验证账户首次 OTP 登录时，认证库会清除未证明归属的旧密码与会话。保留安全行为，在账户安全页增加说明及“通过邮件设置密码”入口；完整浏览器回归先复现入口缺失，再验证 OTP 首次验邮、邮件重设及密码登录成功。
+- 新增真实 SMTP/数据库回归覆盖哈希、有效期、错误次数、并发消费、重放、重发、未知邮箱、HTTP 限流和发送失败；前端覆盖输入验证、方式切换、更换邮箱、冷却、429/网络错误和移动端。测试清理限定本次随机账户及其完整验证码 identifier。
+- 全量 E2E 暴露旧 onboarding 测试的宽泛 alert 定位器偶尔匹配 Next 路由播报节点；限定在认证表单内，避免把路由播报误认为表单错误。开发服务器重建类型文件期间的一次 typecheck 因临时生成文件缺失失败，生产构建后的独立 typecheck 复查通过。
+- 无新增依赖、无数据库迁移。测试邮件仅通过 loopback SMTP 捕获，未验证生产外部 SMTP 投递；沿用原有进程内限流，多实例持续限流与压力表现不在本次验收范围。
+
+验证结果：`pnpm test` 19 个文件、195 项通过（认证子进程另含 20 项真实认证检查）；`PLAYWRIGHT_CHANNEL=chrome pnpm test:e2e` 22 项通过。`pnpm lint`、`pnpm typecheck`、`pnpm format:check`、Vercel production 参数下 `pnpm build` 和 `git diff --check` 通过。修改文件 UTF-8、无 BOM、无异常替换字符或新增个人绝对路径；未改动秘密配置。当前分支为 `feat/full-birthday-platform`，仅按用户要求推送该分支，不执行生产发布。
